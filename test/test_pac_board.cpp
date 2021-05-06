@@ -15,6 +15,15 @@ Board makeCrossBoard()
     board.graph  = {{1,{3}}, {2,{3}}, {3,{1,2,4,5}}, {4,{3}}, {5,{3}} };
     return board;
 }
+Board makeMaze1()
+{
+     vector<string> maze = {"%--------------%---%",
+                            "%-%%-%%-%%-%%-%%-%-%",
+                            "%----------------%-%",
+                            "%%%%%%%%%%%%%%%%%%-%",
+                            "%------------------%"};
+     return Board::create(maze, '-', '%');
+}
 
 TEST(PacBoard, makeCrossBoard)
 {
@@ -64,4 +73,22 @@ TEST(PacBoard, findPath_crossboard_54)
     ASSERT_EQ(5,path[0]);
     ASSERT_EQ(3,path[1]);
     ASSERT_EQ(4,path[2]);
+}
+TEST(PacBoard, findPath_maze1_01_41)
+{
+    Board board = makeMaze1();
+    auto from = Board::pos2id(0, 1);
+    auto to   = Board::pos2id(4, 1);
+    auto path = board.findPath(from, to);
+    ASSERT_EQ(43,path.size());
+    ASSERT_EQ(to, path.back());
+}
+TEST(PacBoard, findPath_maze1_014_41)
+{
+    Board board = makeMaze1();
+    auto from = Board::pos2id(0, 14);
+    auto to   = Board::pos2id(4, 1);
+    auto path = board.findPath(from, to);
+    ASSERT_EQ(32,path.size());
+    ASSERT_EQ(to, path.back());
 }

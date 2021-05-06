@@ -86,7 +86,7 @@ namespace Pac
     {
         Board::Fields_t fields;
         const unsigned int WIDTH = desc[0].size();
-        for (int row=0; row < desc.size()-1; ++row) {
+        for (int row=0; row < desc.size(); ++row) {
             //cout << desc[row] << endl;
             for (int col=0;col<WIDTH;++col) {
                 if (desc[row][col] == open){
@@ -111,7 +111,26 @@ namespace Pac
         }
         return board;
     }
-
+    void Board::dump()
+    {
+        cout << "fields" << endl;
+        for (const auto & f : fields) {
+            cout << id2s(f) << endl;
+        }
+        cout << "edges" << endl;
+        for(const auto & kv : graph) {
+            cout << id2s(kv.first) << ":";
+            const auto & ne = kv.second;
+            for (int i=0;i<ne.cnt; ++i) cout << id2s(ne.ids[i]) << ",";
+            cout << endl;
+        }
+    }
+    string Board::id2s(Board::FieldId_t f)
+    {
+        int r,c;
+        Board::id2pos(f,r,c);
+        return "(" + std::to_string(r) + "," + std::to_string(c) + ")";
+    }
     vector<Board::FieldId_t> Board::findPath(Board::FieldId_t from, Board::FieldId_t to)
     {
         int shortestDist = 1000000;
@@ -143,8 +162,11 @@ namespace Pac
                         shortestPath = path;
                     }
                 }
-                else
-                {
+                else if (path.size() >= shortestDist) {
+                    //no need to continue, backtrack!
+                    path.pop_back();
+                }
+                else {
                     queue.push_back(graph[next_field]);
                     continue;
                 }

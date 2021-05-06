@@ -40,11 +40,13 @@ namespace Pac
         unsigned int WIDTH,HEIGHT;
 
         static Board create(const vector<string>& description, char open='-', char blocked='%');
+        void dump();
         static inline FieldId_t pos2id(int r, int c) { return r << 8 | c & 0xff;}
         static inline void id2pos(FieldId_t f, int & r, int & c) {
             c = f & 0xff;
             r = f >> 8;
         }
+        static string id2s(Board::FieldId_t f);
         inline Neighbours_t makeNeighbours(FieldId_t f)
         {
             int r,c;
@@ -62,13 +64,13 @@ namespace Pac
                     n.add(ne);
                 }
             }
-            if (c<WIDTH-2) {
+            if (c<WIDTH-1) {
                 auto ne = pos2id(r,c+1);
                 if (fields.find(ne) != fields.end()) {
                     n.add(ne);
                 }
             }
-            if (r<HEIGHT-2){
+            if (r<HEIGHT-1){
                 auto ne = pos2id(r+1,c);
                 if(fields.find(ne)!=fields.end()){
                     n.add(ne);
