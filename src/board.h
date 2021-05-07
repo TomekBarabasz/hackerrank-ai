@@ -47,37 +47,7 @@ namespace Pac
             r = f >> 8;
         }
         static string id2s(Board::FieldId_t f);
-        inline Neighbours_t makeNeighbours(FieldId_t f)
-        {
-            int r,c;
-            Neighbours_t n;
-            id2pos(f,r,c);
-            if (r>0) {
-                auto ne = pos2id(r-1,c);
-                if (fields.find(ne)!=fields.end()){
-                    n.add( ne );
-                }
-            }
-            if (c>0) {
-                auto ne = pos2id(r,c-1);
-                if (fields.find(ne)!=fields.end()){
-                    n.add(ne);
-                }
-            }
-            if (c<WIDTH-1) {
-                auto ne = pos2id(r,c+1);
-                if (fields.find(ne) != fields.end()) {
-                    n.add(ne);
-                }
-            }
-            if (r<HEIGHT-1){
-                auto ne = pos2id(r+1,c);
-                if(fields.find(ne)!=fields.end()){
-                    n.add(ne);
-                }
-            }
-            return n;
-        }
+        Neighbours_t makeNeighbours(FieldId_t f);
         vector<FieldId_t> findPath(FieldId_t from, FieldId_t to);
     };
 }

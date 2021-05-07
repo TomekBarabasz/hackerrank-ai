@@ -131,6 +131,44 @@ namespace Pac
         Board::id2pos(f,r,c);
         return "(" + std::to_string(r) + "," + std::to_string(c) + ")";
     }
+    Board::Neighbours_t Board::makeNeighbours(Board::FieldId_t f)
+    {
+        int r,c;
+        Neighbours_t n;
+        id2pos(f,r,c);
+        if (r<HEIGHT-1){ //DOWN
+            auto ne = pos2id(r+1,c);
+            if(fields.find(ne)!=fields.end()){
+                n.add(ne);
+            }
+        }
+        if (c<WIDTH-1) { //RIGHT
+            auto ne = pos2id(r,c+1);
+            if (fields.find(ne) != fields.end()) {
+                n.add(ne);
+            }
+        }
+        if (c>0) { //LEFT
+            auto ne = pos2id(r,c-1);
+            if (fields.find(ne)!=fields.end()){
+                n.add(ne);
+            }
+        }
+        if (r>0) { //UP
+            auto ne = pos2id(r-1,c);
+            if (fields.find(ne)!=fields.end()){
+                n.add( ne );
+            }
+        }
+        return n;
+    }
+    void dumpPath(const vector<Board::FieldId_t>& path)
+    {
+        for(const auto & e: path){
+            cout << Board::id2s(e) << " ";
+        }
+        cout << endl;
+    }
     vector<Board::FieldId_t> Board::findPath(Board::FieldId_t from, Board::FieldId_t to)
     {
         int shortestDist = 1000000;
@@ -140,7 +178,7 @@ namespace Pac
         while( !queue.empty() )
         {
             auto & neighbours = queue.back();
-            FieldId_t next_field;
+            auto next_field = path.back();
             bool found=false;
 
             while (neighbours.cnt > 0 && !found)
@@ -154,20 +192,23 @@ namespace Pac
             if (found)
             {
                 path.push_back(next_field);
+                queue.push_back(graph[next_field]);
+
                 if (next_field==to)
                 {
                     const int dist = path.size();
+                    cout << "new path found, length " << dist << endl;
+                    dumpPath(path);
                     if (dist < shortestDist) {
+                        cout << "replacing shortest path" << endl;
                         shortestDist = dist;
                         shortestPath = path;
                     }
                 }
                 else if (path.size() >= shortestDist) {
                     //no need to continue, backtrack!
-                    path.pop_back();
                 }
                 else {
-                    queue.push_back(graph[next_field]);
                     continue;
                 }
             }
