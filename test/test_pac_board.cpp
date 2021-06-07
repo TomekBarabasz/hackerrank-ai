@@ -3,7 +3,7 @@
 //
 
 #include <gtest/gtest.h>
-#include <board.h>
+#include <lib/board.h>
 
 using namespace Pac;
 using namespace std;

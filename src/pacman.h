@@ -5,7 +5,7 @@
 #ifndef HACKERRANK_AI_PACMAN_H
 #define HACKERRANK_AI_PACMAN_H
 
-#include <board.h>
+#include <lib/board.h>
 #include <string>
 using std::string;
 

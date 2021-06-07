@@ -26,4 +26,10 @@ namespace Utils
             while(ady--) cout << commands[dir] << endl;
         }
     }
+    void printBoard(const vector<string>& board)
+    {
+        for (auto &r : board) {
+            cout << r << endl;
+        }
+    }
 }

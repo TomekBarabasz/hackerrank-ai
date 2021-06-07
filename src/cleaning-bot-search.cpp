@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <time.h>
 #include <cstring>
-#include "board.h"
-#include "utils.h"
+#include "lib/board.h"
+#include "lib/utils.h"
 
 using namespace std;
 namespace {

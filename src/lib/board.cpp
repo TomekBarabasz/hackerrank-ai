@@ -22,9 +22,9 @@ vector<string> makeRandomBoard(int h, int w, int dnum)
     while (dpos.size() < dnum) {
         dpos.insert(rand() % HW);
     }
-    cout << "board pos ";
-    for (auto p : dpos) cout << p << " ";
-    cout << endl;
+    //cout << "board pos ";
+    //for (auto p : dpos) cout << p << " ";
+    //cout << endl;
     ostringstream ss;
     int pos = 0;
     auto ipos = dpos.begin();
@@ -41,6 +41,11 @@ vector<string> makeRandomBoard(int h, int w, int dnum)
         ss.str("");
     }
     return board;
+}
+
+std::tuple<int,int> makeRandomPosition(int rows, int cols)
+{
+    return { rand() % rows, rand() % cols };
 }
 
 vector<int> findDirt(const vector<string> &board)
@@ -197,10 +202,10 @@ namespace Pac
                 if (next_field==to)
                 {
                     const int dist = path.size();
-                    cout << "new path found, length " << dist << endl;
-                    dumpPath(path);
+                    //cout << "new path found, length " << dist << endl;
+                    //dumpPath(path);
                     if (dist < shortestDist) {
-                        cout << "replacing shortest path" << endl;
+                        //cout << "replacing shortest path" << endl;
                         shortestDist = dist;
                         shortestPath = path;
                     }

@@ -9,15 +9,18 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <tuple>
 
 using std::string;
 using std::vector;
 using std::map;
 using std::set;
+using std::tuple;
 
 namespace CBot
 {
     vector<string> makeRandomBoard(int h, int w, int dirt_cnt);
+    std::tuple<int,int> makeRandomPosition(int rows, int cols);
     vector<int> findDirt(const vector<string> &board);
     int evalRoute(int start, const vector<int> &route, int n);
     int calcSteps(int p0, int p1, int N);
