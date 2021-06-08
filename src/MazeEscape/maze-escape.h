@@ -18,6 +18,7 @@ namespace MazeEscape
 {
     inline int oneOf(int a, int b) { return rand() < RAND_MAX / 2 ? a : b; }
     string rot90(const string &area, bool cw);
+    enum Direction { UP=0, RIGHT=1, DOWN=2, LEFT=3};
     struct Area
     {
         Area() : topr(-1), topc(-1), _rows(0), _cols(0){}
@@ -43,11 +44,16 @@ namespace MazeEscape
 
         int toprow()  const { return topr; }
         int leftcol() const { return topc; }
+        bool isWall(int r, int c) const { return area_[r][c] == WALL_TILE; }
+        bool isVisited(int r, int c) const { return area_[r][c] == VISITED_TILE; }
 
     private:
         void extend(int posr, int posc);
 
-        static constexpr char UNKNOWN = '?';
+        static constexpr char UNKNOWN_TILE = '?';
+        static constexpr char WALL_TILE = '#';
+        static constexpr char VISITED_TILE = '.';
+
         vector<string> area_;
         int topr, topc, _rows, _cols;
     };
@@ -56,10 +62,23 @@ namespace MazeEscape
 
     struct Agent
     {
-        int makeMove(const Area &view, ofstream &storage);
-        int goAlongAwall(const Area &area);
+        static Agent* create(const char* type);
+        Agent() : _posr(0), _posc(0), _dir(0) {}
+
+        virtual int makeMove(const Area &view)=0;
         int moveToPos(const Area &view, int pos);
         int makeRandomMove(const Area &view);
+
+        int row() const { return _posr;}
+        int col() const { return _posc;}
+        int dir() const { return _dir; }
+
+        const Area& getExploredArea() const { return exploredArea; }
+        static void updatePos(int& posr,int& posc, int dir);
+
+    protected:
+        int _posr,_posc,_dir;
+        Area exploredArea;
     };
 }
 

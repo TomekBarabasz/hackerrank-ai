@@ -114,7 +114,7 @@ int main(int argc, char** argv)
         for (int ip=0;ip<NiterPos;++ip)
         {
             auto [posr,posc] = makeRandomPosition(ROWS,COLS);
-            std::cout << "posr " << posr << " posc " << posc << endl;
+            std::cout << "_posr " << posr << " _posc " << posc << endl;
             auto path = findShortestPath(board, posr, posc);
         }
     }

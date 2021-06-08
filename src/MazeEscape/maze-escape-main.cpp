@@ -87,73 +87,61 @@ string dirToString(int dir)
     return Dirs.at(dir);
 }
 
-void updatePos(int& posr,int& posc, int dir)
-{
-    switch(dir){
-        case 0: posr--; break;
-        case 1: posc++; break;
-        case 2: posr++; break;
-        case 3: posc--; break;
-    }
-}
-
 int main(int argc, char** argv)
 {
     static const char *tmpFilename = "tmpfile.txt";
     if (1==argc) {
-        cout << "usage: maze-escape mazeid posr posc dir nmoves" << endl;
+        cout << "usage: maze-escape mazeid _posr _posc _dir nmoves" << endl;
         return 1;
     }
     const int mazeId = atoi(argv[1]);
-    int posr = argc > 2 ? atoi(argv[2]) : -1;
-    int posc = argc > 3 ? atoi(argv[3]) : -1;
-    int dir = argc > 4 ? atoi(argv[4]) : -1;
-    int nmoves = argc > 5 ? atoi(argv[5]) : 1000;
-
     const auto maze = makeMaze(mazeId);
     const int ROWS = maze.rows();
     const int COLS = maze.cols();
 
+    int posr = argc > 2 ? atoi(argv[2]) : -1;
+    int posc = argc > 3 ? atoi(argv[3]) : -1;
+    int dir = argc > 4 ? atoi(argv[4]) : -1;
+    int nmoves = argc > 5 ? atoi(argv[5]) : 1000;
     if (posr < 0) posr = rand() % ROWS;
     if (posc < 0) posc = rand() % COLS;
-
     if (dir < 0) dir = rand() % 4;
-
-    cout << "posr " << posr << " posc " << posc << " dir " << dir << endl;
+    cout << "_posr " << posr << " _posc " << posc << " _dir " << dir << endl;
 
     std::ofstream tmp(tmpFilename);
     vector<int> moves;
-    Area exploredArea;
-    int rel_posr=0, rel_posc=0, rel_dir=0;
-    Agent agent;
+    Agent *agent = Agent::create("nomem_1");
+
     while( maze[posr][posc] != 'e' && nmoves-->0 )
     {
         auto view = maze.getView(posr,posc,dir);
-        const int move = agent.makeMove(view, tmp);
-        Area aligned = view.alingNorth(dir);
-        exploredArea.append(aligned, rel_posr, rel_posc, dir, '.');
+        const int move = agent->makeMove(view);
         moves.push_back(move);
         dir = (dir+move) % 4;
-        updatePos(posr,posc,dir);
-        updatePos(rel_posr,rel_posc,dir);
+        Agent::updatePos(posr,posc,dir);
+        if (posr<0 || posc<0 || posr>=ROWS || posc>=COLS || maze.isWall(posr,posc)){
+            cout << "agent specified invalid move, next postion is (" << posr << "," << posc << ")" << endl;
+            return 1;
+        }
         //for (auto & r : view) cout << r << std::endl;
-        //cout << dirToString(move) << " new dir " << dirToString(dir) << " new pos " << posr << " " << posc << std::endl;
+        //cout << dirToString(move) << " new _dir " << dirToString(_dir) << " new pos " << _posr << " " << _posc << std::endl;
     }
     if (maze[posr][posc] != 'e') {
         cout << "failed" << endl;
     }else{
         cout << "found exit within " << moves.size() << "moves" << endl;
     }
-    
-    cout << "explored area_ " << std::endl;
-    for (int i=0; i < exploredArea.rows(); ++i)
-        cout << exploredArea.getRow(i) << endl;
+
+    auto ea = agent->getExploredArea();
+    cout << "explored area " << endl;
+    for (int i=0; i < ea.rows(); ++i)
+        cout << ea.getRow(i) << endl;
     
     //for (auto & m : moves){
     //    cout<< dirToString(m) << std::endl;
     //}
 
     std::remove(tmpFilename);
-
+    delete agent;
     return 0;
 }

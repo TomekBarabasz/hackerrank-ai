@@ -57,13 +57,13 @@ namespace MazeEscape
             _cols++;
         }
     }
-    //note: posr, posc are center of view
+    //note: _posr, _posc are center of view
     void Area::append(const Area &view, int posr, int posc, int dir, char visited)
     {
         if (!area_.empty()) extend(posr, posc);
         else init();
         posr--; posc--;
-        //posr,posc are now upper left corner
+        //_posr,_posc are now upper left corner
         const int ridx = posr - topr;
         const int cidx = posc - topc;
 

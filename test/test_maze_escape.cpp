@@ -26,35 +26,40 @@ Area makeLeftWall()
 TEST(MazeEscape, corner_0)
 {
     auto area = makeCorner();
-    Agent a;
-    ASSERT_EQ(1, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(1, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, corner_90)
 {
     Area area = rot90cw(makeCorner());
-    Agent a;
-    ASSERT_EQ(2, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(2, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, corner_180)
 {
     auto area =  rot90cw(rot90cw(makeCorner()));
-    Agent a;
-    ASSERT_EQ(3, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(3, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, corner_left_up)
 {
     vector<string> area = { "###",
                             "#--",
                             "#--" };
-    Agent a;
-    ASSERT_EQ(1, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(1, a->makeMove(area));
+    delete a;
 }
 
 TEST(MazeEscape, corner_270)
 {
     auto area =  rot90cw(rot90cw(rot90cw(makeCorner())));
-    Agent a;
-    ASSERT_EQ(0, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(0, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, match_3)
 {
@@ -65,26 +70,30 @@ TEST(MazeEscape, match_3)
 TEST(MazeEscape, wall_0)
 {
     auto area = makeLeftWall();
-    Agent a;
-    ASSERT_EQ(0, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(0, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, wall_90)
 {
     auto area = rot90cw(makeLeftWall());
-    Agent a;
-    ASSERT_EQ(1, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(1, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, wall_180)
 {
     auto area = rot90cw(rot90cw(makeLeftWall()));
-    Agent a;
-    ASSERT_EQ(2, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(2, a->makeMove(area));
+    delete a;
 }
 TEST(MazeEscape, wall_270)
 {
     auto area = rot90cw(rot90cw(rot90cw(makeLeftWall())));
-    Agent a;
-    ASSERT_EQ(3, a.goAlongAwall(area));
+    Agent *a = Agent::create("nomem_1");
+    ASSERT_EQ(3, a->makeMove(area));
+    delete a;
 }
 
 TEST(MazeEscape, explore_init)
