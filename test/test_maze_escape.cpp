@@ -38,22 +38,22 @@ Area makeMaze1()
 TEST(MazeEscape, corner_0)
 {
     auto area = makeCorner();
-    Agent *a = Agent::create("nomem_1");
-    ASSERT_EQ(1, a->makeMove(area));
+    Agent *a = Agent::create("nomem");
+    ASSERT_EQ(Direction::RIGHT, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, corner_90)
 {
     Area area = rot90cw(makeCorner());
-    Agent *a = Agent::create("nomem_1");
-    ASSERT_EQ(2, a->makeMove(area));
+    Agent *a = Agent::create("nomem");
+    ASSERT_EQ(Direction::LEFT, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, corner_180)
 {
     auto area =  rot90cw(rot90cw(makeCorner()));
-    Agent *a = Agent::create("nomem_1");
-    ASSERT_EQ(3, a->makeMove(area));
+    Agent *a = Agent::create("nomem");
+    ASSERT_EQ(Direction::UP, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, corner_left_up)
@@ -69,7 +69,7 @@ TEST(MazeEscape, corner_left_up)
 TEST(MazeEscape, corner_270)
 {
     auto area =  rot90cw(rot90cw(rot90cw(makeCorner())));
-    Agent *a = Agent::create("nomem_1");
+    Agent *a = Agent::create("nomem");
     ASSERT_EQ(0, a->makeMove(area));
     delete a;
 }
@@ -82,28 +82,28 @@ TEST(MazeEscape, match_3)
 TEST(MazeEscape, wall_0)
 {
     auto area = makeLeftWall();
-    Agent *a = Agent::create("nomem_1");
+    Agent *a = Agent::create("nomem");
     ASSERT_EQ(0, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, wall_90)
 {
     auto area = rot90cw(makeLeftWall());
-    Agent *a = Agent::create("nomem_1");
-    ASSERT_EQ(1, a->makeMove(area));
+    Agent *a = Agent::create("nomem");
+    ASSERT_EQ(Direction::LEFT, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, wall_180)
 {
     auto area = rot90cw(rot90cw(makeLeftWall()));
-    Agent *a = Agent::create("nomem_1");
-    ASSERT_EQ(2, a->makeMove(area));
+    Agent *a = Agent::create("nomem");
+    ASSERT_EQ(Direction::UP, a->makeMove(area));
     delete a;
 }
 TEST(MazeEscape, wall_270)
 {
     auto area = rot90cw(rot90cw(rot90cw(makeLeftWall())));
-    Agent *a = Agent::create("nomem_1");
+    Agent *a = Agent::create("nomem");
     ASSERT_EQ(3, a->makeMove(area));
     delete a;
 }

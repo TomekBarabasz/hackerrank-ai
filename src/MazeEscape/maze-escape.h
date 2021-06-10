@@ -10,9 +10,12 @@
 #include <algorithm>
 #include <string>
 #include <map>
+#include <tuple>
+
 using std::vector;
 using std::string;
 using std::ofstream;
+using std::tuple;
 
 namespace MazeEscape
 {
@@ -21,7 +24,7 @@ namespace MazeEscape
 
     struct Area
     {
-        Area() : topr(-1), topc(-1), _rows(0), _cols(0){}
+        Area(int topr_=0, int topc_=0) : topr(topr_-1), topc(topc_-1), _rows(0), _cols(0){}
         Area(const string& area) : area_(Area::split(area)), topr(-1), topc(-1), _rows(3), _cols(3){}
         Area(const vector<string>& area) : area_(area), topr(0), topc(0), _rows(area.size()), _cols(area[0].size()){}
 
@@ -38,7 +41,7 @@ namespace MazeEscape
         void rot90ccw() { area_ = split(rot90(concat(), false)); }
         string concat() const { return area_[0] + area_[1] + area_[2]; }
         static vector<string> split(const string& area) { return { area.substr(0,3), area.substr(3,3), area.substr(6,3) }; }
-        Area alingNorth(int dir) const;
+        Area alignNorth(int dir) const;
         int find(char element) const;
         static bool compare(char exp, char c);
         Direction matchFeature(string feature, bool rot) const;
@@ -61,6 +64,7 @@ namespace MazeEscape
     inline Area rot90cw(const Area& a)  { return Area(rot90(a.concat(),true)); }
     inline Area rot90ccw(const Area& a) { return Area(rot90(a.concat(),false)); }
 
+    using FeatureList_t = vector<tuple<string,Direction>>;
     struct Agent
     {
         static Agent* create(const char* type);
@@ -76,6 +80,7 @@ namespace MazeEscape
         const Area& getExploredArea() const { return exploredArea; }
         static void updatePos(int& posr,int& posc, int dir);
         static Direction tryMoveByFeature(const Area& a);
+        static Direction tryMoveByFeatureEx(const Area& a, const FeatureList_t&);
     protected:
         int _posr,_posc,_dir;
         Area exploredArea;

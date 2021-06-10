@@ -26,7 +26,6 @@ namespace MazeEscape
     void Area::init()
     {
         area_ = {"???", "???", "???"};
-        topr=-1; topc=-1;
         _rows= _cols=3;
     }
 
@@ -138,7 +137,7 @@ namespace MazeEscape
         }
         return view;
     }
-    Area Area::alingNorth(int dir) const
+    Area Area::alignNorth(int dir) const
     {
         string a = concat();
         while(dir != 0)

@@ -127,12 +127,16 @@ int main(int argc, char** argv)
 
     std::ofstream tmp(tmpFilename);
     vector<int> moves;
-    Agent *agent = Agent::create("mem");
+    Agent *agent = Agent::create("nomem");
+    Area exploredArea(posr,posc);
 
+    cout << " ea " << exploredArea.toprow() << " " <<exploredArea.leftcol() << endl;
     int moveNum=1;
     while( maze[posr][posc] != 'e' && nmoves-->0 )
     {
         auto view = maze.getView(posr,posc,dir);
+        //exploredArea.append(view.alignNorth(agent->dir()), agent->row(), agent->col(), Area::VISITED_TILE);
+        exploredArea.append(view.alignNorth(dir), posr, posc, Area::VISITED_TILE);
         if (debugFlags & TRACE_MOVES) {
             cout << "move num " << moveNum++ << " position " << posr << "," << posc << " dir " << dirToString(dir) << endl;
             cout << "view:" << endl; view.dump();
@@ -158,9 +162,8 @@ int main(int argc, char** argv)
         cout << "found exit within " << moves.size() << "moves" << endl;
     }
 
-    auto ea = agent->getExploredArea();
     cout << "explored area " << endl;
-    ea.dump();
+    exploredArea.dump();
 
     if (debugFlags & PRINT_MOVES)
     {

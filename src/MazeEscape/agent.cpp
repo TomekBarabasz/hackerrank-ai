@@ -46,13 +46,13 @@ namespace MazeEscape
                 return makeRandomDir();
         }
     }
-    int makeRandomMove(const Area &view)
+    Direction makeRandomMove(const Area &view)
     {
-        vector<int> dirs;
-        if (view[0][1] == '-') dirs.push_back(0);
-        if (view[1][0] == '-') dirs.push_back(1);
-        if (view[2][1] == '-') dirs.push_back(2);
-        if (view[1][2] == '-') dirs.push_back(3);
+        vector<Direction> dirs;
+        if (view[0][1] == '-') dirs.push_back(Direction::UP);
+        if (view[1][0] == '-') dirs.push_back(Direction::RIGHT);
+        if (view[2][1] == '-') dirs.push_back(Direction::DOWN);
+        if (view[1][2] == '-') dirs.push_back(Direction::LEFT);
         return dirs[rand() % dirs.size()];
     }
     void Agent::updatePos(int& posr,int& posc, int dir)
@@ -64,55 +64,74 @@ namespace MazeEscape
             case 3: posc--; break;
         }
     }
-
+    FeatureList_t stick_to_wall = {
+        {"#-?"\
+         "#??"\
+         "#??", Direction::UP},
+        {"?-#"\
+         "??#"\
+         "??#", Direction::UP},
+        {"???"\
+         "-??"\
+         "#??", Direction::LEFT},
+        {"???"\
+         "??-"\
+         "??#", Direction::RIGHT},
+        {"?-?"\
+         "???"\
+         "???", Direction::UP},
+        {"?#?"\
+         "-??"\
+         "???", Direction::LEFT},
+         {"?#?"\
+         "??-"\
+         "???", Direction::RIGHT}
+    };
+    FeatureList_t up_right_left_back = {
+            {"?-?"\
+         "???"\
+         "???", Direction::UP},
+            {"?#?"\
+         "-??"\
+         "???", Direction::LEFT},
+            {"?#?"\
+         "??-"\
+         "???", Direction::RIGHT},
+            {"?#?"\
+         "#?#"\
+         "?-?", Direction::DOWN}
+    };
     Direction Agent::tryMoveByFeature(const Area& a)
     {
-        vector<tuple<string,Direction>> features = {
-            {"???"\
-             "-??"\
-             "#??", Direction::LEFT},
-            {"?-?"\
-             "???"\
-             "???", Direction::UP},
-            {"?#?"\
-             "??-"\
-             "???", Direction::RIGHT}
-        };
+        return tryMoveByFeatureEx(a, stick_to_wall);
+    }
+    Direction Agent::tryMoveByFeatureEx(const Area& a, const FeatureList_t & features)
+    {
         for (auto & [str,dir] : features) {
             int v = a.matchFeature(str, false);
             if (v!=Direction::INVALID) return static_cast<Direction>((dir+v) % 4);
         }
         return Direction::INVALID;
     }
-
-    struct MemorylessAgent1 : Agent
+    struct MemorylessAgent : Agent
     {
-        Direction makeMove(const Area &area) override
+        Direction makeMove(const Area &view) override
         {
-            string a = area[0] + area[1] + area[2];
-            string features[] = {"###------", "#-#------","####--#--" };
-            for (const auto & f : features) {
-                auto dir = area.matchFeature(f, true);
-                if (dir != Direction::INVALID) return dirRot90cw(dir);
+            const int exitp = view.find('e');
+            if (exitp < 0)
+            {
+                auto dir = tryMoveByFeatureEx(view, stick_to_wall);
+                if (dir != Direction::INVALID) {
+                    return dir;
+                }
+                std::cout << "position " << _posr << "," << _posc << " agent doing random move!" << std::endl;
+                view.dump();
+                return makeRandomMove(view);
             }
-
-            if (area[0][1] == '-') return Direction::UP;
-            if (area[0][0] == '-') return Direction::LEFT;
-            if (area[0][2] == '-') return Direction::RIGHT;
-
-            return makeRandomDir();
-        }
-    };
-
-    struct MemorylessAgent2 : Agent
-    {
-        Direction makeMove(const Area &area) override
-        {
-            auto dir = tryMoveByFeature(area);
-            if (dir != Direction::INVALID) return dirRot90cw(dir);
-            std::cout << "agent doing random move!" << std::endl;
-            area.dump();
-            return makeRandomDir();
+            else
+            {
+                return moveToPos(view, exitp);
+            }
         }
     };
 
@@ -121,19 +140,18 @@ namespace MazeEscape
         Direction makeMoveImpl(const Area &area)
         {
             auto view = area.getView(_posr,_posc,_dir);
-            auto dir = tryMoveByFeature(view);
+            auto dir = tryMoveByFeatureEx(view, stick_to_wall);
             if (dir != Direction::INVALID) {
-                //return dirRot90cw(dir);
                 return dir;
             }
             std::cout << "position " << _posr << "," << _posc << " agent doing random move!" << std::endl;
             area.dump();
-            return makeRandomDir();
+            return makeRandomMove(view);
         }
 
         Direction makeMove(const Area &view) override
         {
-            Area aligned = view.alingNorth(_dir);
+            Area aligned = view.alignNorth(_dir);
             exploredArea.append(aligned, _posr, _posc, Area::VISITED_TILE);
 
             const int exitp = view.find('e');
@@ -155,10 +173,9 @@ namespace MazeEscape
 
     Agent* Agent::create(const char *type)
     {
-        if (0==strcmp(type,"nomem_1")) { return new MemorylessAgent1(); }
-        if (0==strcmp(type,"nomem_2")) { return new MemorylessAgent2(); }
+        if (0==strcmp(type,"nomem")) { return new MemorylessAgent(); }
         if (0==strcmp(type,"mem")) { return new MemoryAgent(); }
         if (0==strcmp(type,"filemem")) { return new FilememAgent(); }
-        return new MemorylessAgent1();
+        return new MemorylessAgent();
     }
 }
