@@ -23,6 +23,18 @@ Area makeLeftWall()
     return area;
 }
 
+Area makeMaze1()
+{
+    vector<string> maze = {"#######",
+                           "#--#--#",
+                           "#-----#",
+                           "##---##",
+                           "#-----#",
+                           "#--#--#",
+                           "#######"};
+    return maze;
+}
+
 TEST(MazeEscape, corner_0)
 {
     auto area = makeCorner();
@@ -65,7 +77,7 @@ TEST(MazeEscape, match_3)
 {
     Area wall_left("#--#--#--");
     const string wall_front = "###------";
-    ASSERT_EQ(3, wall_left.matchFeature(wall_front));
+    ASSERT_EQ(3, wall_left.matchFeature(wall_front, true));
 }
 TEST(MazeEscape, wall_0)
 {
@@ -100,7 +112,7 @@ TEST(MazeEscape, explore_init)
 {
     Area ea;
     Area view({"---","---","---"});
-    ea.append(view,0,0,0);
+    ea.append(view,0,0);
     ASSERT_EQ(ea.toprow(),-1);
     ASSERT_EQ(ea.leftcol(),-1);
     ASSERT_EQ(ea.rows(), 3);
@@ -117,9 +129,9 @@ TEST(MazeEscape, explore_up)
     Area v1({"---","---","---"});
     Area v3({"###","---","---"});
 
-    ea.append(v1, 0,0,0);
-    ea.append(v1,-1,0,0);
-    ea.append(v3,-2,0,0);
+    ea.append(v1, 0,0);
+    ea.append(v1,-1,0);
+    ea.append(v3,-2,0);
 
     ASSERT_EQ(ea.toprow(),-3);
     ASSERT_EQ(ea.leftcol(),-1);
@@ -137,9 +149,9 @@ TEST(MazeEscape, explore_down)
     Area ea;
     Area v1({"---","---","---"});
 
-    ea.append(v1,0,0,0);
-    ea.append(v1,1,0,0);
-    ea.append(Area({"---","---","###"}),2,0,0);
+    ea.append(v1,0,0);
+    ea.append(v1,1,0);
+    ea.append(Area({"---","---","###"}),2,0);
 
     ASSERT_EQ(ea.toprow(),-1);
     ASSERT_EQ(ea.leftcol(),-1);
@@ -157,9 +169,9 @@ TEST(MazeEscape, explore_left)
     Area ea;
     Area v1({"---","---","---"});
 
-    ea.append(v1,0,0,0);
-    ea.append(v1,0,-1,0);
-    ea.append(Area({"#--","#--","#--"}),0,-2,0);
+    ea.append(v1,0,0);
+    ea.append(v1,0,-1);
+    ea.append(Area({"#--","#--","#--"}),0,-2);
 
     ASSERT_EQ(ea.toprow(),-1);
     ASSERT_EQ(ea.leftcol(),-3);
@@ -175,9 +187,9 @@ TEST(MazeEscape, explore_right)
     Area ea;
     Area v1({"---","---","---"});
 
-    ea.append(v1,0,0,0);
-    ea.append(v1,0,1,0);
-    ea.append(Area({"--#","--#","--#"}),0,2,0);
+    ea.append(v1,0,0);
+    ea.append(v1,0,1);
+    ea.append(Area({"--#","--#","--#"}),0,2);
 
     ASSERT_EQ(ea.toprow(),-1);
     ASSERT_EQ(ea.leftcol(),-1);
@@ -191,9 +203,9 @@ TEST(MazeEscape, explore_right)
 TEST(MazeEscape, explore_up_left)
 {
     Area ea;
-    ea.append(Area({"#--","---","---"}), 0,0,0);
-    ea.append(Area({"###","#--","---"}),-1,0,0);
-    ea.append(Area({"###","--#","--#"}),-1,1,0);
+    ea.append(Area({"#--","---","---"}), 0,0);
+    ea.append(Area({"###","#--","---"}),-1,0);
+    ea.append(Area({"###","--#","--#"}),-1,1);
 
     ASSERT_EQ(ea.toprow(),-2);
     ASSERT_EQ(ea.leftcol(),-1);
@@ -208,9 +220,9 @@ TEST(MazeEscape, explore_up_left)
 TEST(MazeEscape, explore_down_right)
 {
     Area ea;
-    ea.append(Area({"---","---","#--"}), 0,0,0);
-    ea.append(Area({"---","#--","###"}), 1,0,0);
-    ea.append(Area({"--#","--#","###"}), 1,1,0);
+    ea.append(Area({"---","---","#--"}), 0,0);
+    ea.append(Area({"---","#--","###"}), 1,0);
+    ea.append(Area({"--#","--#","###"}), 1,1);
 
 
     ASSERT_EQ(ea.toprow(),-1);
@@ -230,9 +242,9 @@ TEST(MazeEscape, explore_mark_visited)
     Area v1({"---","---","---"});
     Area v2({"--#","--#","--#"});
 
-    ea.append(v1,0,0,0,'.');
-    ea.append(v1,0,1,0,'.');
-    ea.append(v2,0,2,0,'.');
+    ea.append(v1,0,0,'.');
+    ea.append(v1,0,1,'.');
+    ea.append(v2,0,2,'.');
 
     ASSERT_EQ(ea.toprow(),-1);
     ASSERT_EQ(ea.leftcol(),-1);
@@ -245,4 +257,53 @@ TEST(MazeEscape, explore_mark_visited)
     ASSERT_EQ(ea.getRow(0),"----#");
     ASSERT_EQ(ea.getRow(1),"-...#");
     ASSERT_EQ(ea.getRow(2),"----#");
+}
+TEST(MazeEscape, getView_1)
+{
+    Area maze = makeMaze1();
+    auto view = maze.getView(4, 2, Direction::RIGHT);
+    ASSERT_EQ("--#"\
+              "---"\
+              "#--", view.concat());
+}
+TEST(MazeEscape, getView_2)
+{
+    Area maze = makeMaze1();
+    auto view = maze.getView(2, 1, Direction::LEFT);
+    ASSERT_EQ("###"\
+              "#--"\
+              "---", view.concat());
+}
+TEST(MazeEscape, moveByFeature_1)
+{
+    Agent *a = Agent::create("mem");
+    Area maze = makeMaze1();
+    int posr=5, posc=1, dir=0;
+
+    Direction moves[] = { Direction::UP, Direction::RIGHT, Direction::LEFT, Direction::UP, Direction::LEFT, Direction::RIGHT, Direction::RIGHT, Direction::RIGHT};
+    for (auto exectedMove : moves)
+    {
+        auto move = a->makeMove(maze.getView(posr,posc,dir));
+        ASSERT_EQ(exectedMove, move);
+        dir = (dir+move) % 4;
+        Agent::updatePos(posr,posc,dir);
+    }
+    delete a;
+}
+
+TEST(MazeEScape, moveByFeature_2)
+{
+    Area area("###"\
+              "#--"\
+              "---");
+    auto m = Agent::tryMoveByFeature(area);
+    ASSERT_EQ(Direction::RIGHT, m);
+}
+TEST(MazeEScape, moveByFeature_3)
+{
+    Area area(  "##-"\
+                "#--"\
+                "#--");
+    auto m = Agent::tryMoveByFeature(area);
+    ASSERT_EQ(Direction::RIGHT, m);
 }

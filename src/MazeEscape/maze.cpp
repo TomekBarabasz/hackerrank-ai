@@ -58,7 +58,7 @@ namespace MazeEscape
         }
     }
     //note: _posr, _posc are center of view
-    void Area::append(const Area &view, int posr, int posc, int dir, char visited)
+    void Area::append(const Area &view, int posr, int posc, char visited)
     {
         if (!area_.empty()) extend(posr, posc);
         else init();
@@ -127,6 +127,8 @@ namespace MazeEscape
         const Point *offset = Offset.at(dir);
         vector<string> view;
         string row;
+        posr -= topr;
+        posc -= topc;
         for (int i = 0; i < 9; ++i, offset++) {
             row += area_[posr + offset->row][posc + offset->col];
             if (row.size() == 3) {
@@ -142,7 +144,7 @@ namespace MazeEscape
         while(dir != 0)
         {
             a = rot90(a,false);
-            dir = (dir+1)%4;
+            dir = (dir + 1) % 4;
         }
         return Area(a);
     }
@@ -158,13 +160,34 @@ namespace MazeEscape
         }
         return -1;
     }
-    int Area::matchFeature(string feature) const
+    bool Area::compare(char exp, char c)
+    {
+        if (UNKNOWN_TILE == exp) return true;
+        if (exp == c) return true;
+        if (exp=='-' && c=='.') return true;
+        return false;
+    }
+    Direction Area::matchFeature(string feature, bool rot) const
     {
         auto area = concat();
-        for (int i = 0; i < 4; i++) {
-            if (area == feature) return i;
+        for (int i = 0; i < 4; ++i) {
+            //if (area == feature) return i;
+            bool same=true;
+            for (int j=0;j<area.size();++j) {
+                if (!compare(feature[j], area[j])) {
+                    same=false;
+                    break;
+                }
+            }
+            if (same) return static_cast<Direction>(i);
+            if (!rot) break;
             feature = rot90(feature, true);
         }
-        return -1;
+        return Direction::INVALID;
     }
+    void Area::dump() const
+    {
+        for (auto & r : area_) std::cout << r << std::endl;
+    }
+
 }

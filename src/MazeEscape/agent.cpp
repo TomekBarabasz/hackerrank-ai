@@ -2,42 +2,51 @@
 // Created by barabasz on 07.06.2021.
 //
 #include <cstring>
+#include <map>
+#include <tuple>
 #include "maze-escape.h"
+
+using std::map;
+using std::string;
+using std::tuple;
 
 namespace MazeEscape
 {
-    int Agent::moveToPos(const Area &view, int pos)
+    template <typename T> T oneOf(T a, T b) { return rand() < RAND_MAX / 2 ? a : b; }
+    Direction makeRandomDir() { return static_cast<Direction>( rand() % 4 ); }
+    Direction dirRot90cw(Direction dir) { return static_cast<Direction>( (dir+1) % 4); }
+    Direction Agent::moveToPos(const Area &view, int pos)
     {
         switch (pos) {
             case 0:
-                if (view[0][1] == '-') return 0;
-                if (view[1][0] == '-') return 3;
-                return oneOf(1, 2);
+                if (view[0][1] == '-') return Direction::UP;
+                if (view[1][0] == '-') return Direction::LEFT;
+                return oneOf(Direction::RIGHT, Direction::DOWN);
             case 1:
-                return 0;
+                return Direction::UP;
             case 2:
-                if (view[0][1] == '-') return 0;
-                if (view[1][2] == '-') return 1;
-                return oneOf(2, 3);
+                if (view[0][1] == '-') return Direction::UP;
+                if (view[1][2] == '-') return Direction::RIGHT;
+                return oneOf(Direction::DOWN, Direction::LEFT);
             case 3:
-                return 3;
+                return Direction::LEFT;
             case 5:
-                return 1;
+                return Direction::RIGHT;
             case 6:
-                if (view[1][0] == '-') return 3;
-                if (view[2][1] == '-') return 2;
-                return oneOf(0, 1);
+                if (view[1][0] == '-') return Direction::LEFT;
+                if (view[2][1] == '-') return Direction::DOWN;
+                return oneOf(Direction::UP, Direction::RIGHT);
             case 7:
-                return 2;
+                return Direction::DOWN;
             case 8:
-                if (view[1][2] == '-') return 1;
-                if (view[2][1] == '-') return 2;
-                return oneOf(3, 0);
+                if (view[1][2] == '-') return Direction::RIGHT;
+                if (view[2][1] == '-') return Direction::DOWN;
+                return oneOf(Direction::LEFT, Direction::UP);
             default:
-                return rand() % 4;
+                return makeRandomDir();
         }
     }
-    int Agent::makeRandomMove(const Area &view)
+    int makeRandomMove(const Area &view)
     {
         vector<int> dirs;
         if (view[0][1] == '-') dirs.push_back(0);
@@ -56,52 +65,79 @@ namespace MazeEscape
         }
     }
 
+    Direction Agent::tryMoveByFeature(const Area& a)
+    {
+        vector<tuple<string,Direction>> features = {
+            {"???"\
+             "-??"\
+             "#??", Direction::LEFT},
+            {"?-?"\
+             "???"\
+             "???", Direction::UP},
+            {"?#?"\
+             "??-"\
+             "???", Direction::RIGHT}
+        };
+        for (auto & [str,dir] : features) {
+            int v = a.matchFeature(str, false);
+            if (v!=Direction::INVALID) return static_cast<Direction>((dir+v) % 4);
+        }
+        return Direction::INVALID;
+    }
+
     struct MemorylessAgent1 : Agent
     {
-        int rot90cw(int dir) { return (dir+1) % 4; }
-        int makeMove(const Area &area) override
+        Direction makeMove(const Area &area) override
         {
             string a = area[0] + area[1] + area[2];
             string features[] = {"###------", "#-#------","####--#--" };
             for (const auto & f : features) {
-                int dir = area.matchFeature(f);
-                if (dir >= 0) return rot90cw(dir);
+                auto dir = area.matchFeature(f, true);
+                if (dir != Direction::INVALID) return dirRot90cw(dir);
             }
 
-            if (area[0][1] == '-') return 0;
-            if (area[0][0] == '-') return 3;
-            if (area[0][2] == '-') return 1;
+            if (area[0][1] == '-') return Direction::UP;
+            if (area[0][0] == '-') return Direction::LEFT;
+            if (area[0][2] == '-') return Direction::RIGHT;
 
-            return rand() % 4;
+            return makeRandomDir();
         }
     };
 
     struct MemorylessAgent2 : Agent
     {
-        int makeMove(const Area &area) override
+        Direction makeMove(const Area &area) override
         {
-            if (area[0]=="#-#") return RIGHT;
-            if (!area.isWall(0,0) && !area.isWall(1,0) && area.isWall(2,0)) return LEFT;
-            if (!area.isWall(0,1)) return UP;
-
-            return rand() % 4;
+            auto dir = tryMoveByFeature(area);
+            if (dir != Direction::INVALID) return dirRot90cw(dir);
+            std::cout << "agent doing random move!" << std::endl;
+            area.dump();
+            return makeRandomDir();
         }
     };
 
     struct MemoryAgent : Agent
     {
-        int makeMoveImpl(const Area &view)
+        Direction makeMoveImpl(const Area &area)
         {
-            return rand() % 4;
+            auto view = area.getView(_posr,_posc,_dir);
+            auto dir = tryMoveByFeature(view);
+            if (dir != Direction::INVALID) {
+                //return dirRot90cw(dir);
+                return dir;
+            }
+            std::cout << "position " << _posr << "," << _posc << " agent doing random move!" << std::endl;
+            area.dump();
+            return makeRandomDir();
         }
 
-        int makeMove(const Area &view) override
+        Direction makeMove(const Area &view) override
         {
             Area aligned = view.alingNorth(_dir);
-            exploredArea.append(aligned, _posr, _posc, _dir, '.');
+            exploredArea.append(aligned, _posr, _posc, Area::VISITED_TILE);
 
             const int exitp = view.find('e');
-            auto move = exitp < 0 ? makeMoveImpl(view) : moveToPos(view, exitp);
+            auto move = exitp < 0 ? makeMoveImpl(exploredArea) : moveToPos(view, exitp);
 
             _dir = (_dir + move) % 4;
             updatePos(_posr,_posc,_dir);
@@ -111,9 +147,9 @@ namespace MazeEscape
 
     struct FilememAgent : Agent
     {
-        int makeMove(const Area &view) override
+        Direction makeMove(const Area &view) override
         {
-            return 0;
+            return makeRandomDir();
         }
     };
 
