@@ -1,4 +1,4 @@
-add_library(maze-escape-lib STATIC maze.cpp agent.cpp)
+add_library(maze-escape-lib STATIC maze.cpp agent.cpp maze-escape-sub2.cpp)
 target_compile_options(maze-escape-lib PRIVATE
     -g
     ${COMPILE_OPTIONS}

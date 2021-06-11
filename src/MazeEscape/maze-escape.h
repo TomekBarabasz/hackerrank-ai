@@ -24,6 +24,11 @@ namespace MazeEscape
 
     struct Area
     {
+        static constexpr char UNKNOWN_TILE = 'x';
+        static constexpr char WALL_TILE = '#';
+        static constexpr char VISITED_TILE = '.';
+
+        Area(std::ifstream&);
         Area(int topr_=0, int topc_=0) : topr(topr_-1), topc(topc_-1), _rows(0), _cols(0){}
         Area(const string& area) : area_(Area::split(area)), topr(-1), topc(-1), _rows(3), _cols(3){}
         Area(const vector<string>& area) : area_(area), topr(0), topc(0), _rows(area.size()), _cols(area[0].size()){}
@@ -45,16 +50,20 @@ namespace MazeEscape
         int find(char element) const;
         static bool compare(char exp, char c);
         Direction matchFeature(string feature, bool rot) const;
-
+        struct Location { int posr; int posc; int dir;};
+        using Locations_t = vector<Location>;
+        Locations_t findPattern(const Area&) const;
+        Area::Locations_t findClosest(int origr, int origc, char element) const;
+        bool compare(int origr, int origc, const Area&) const;
         int toprow()  const { return topr; }
         int leftcol() const { return topc; }
         bool isWall(int r, int c) const { return area_[r][c] == WALL_TILE; }
         bool isVisited(int r, int c) const { return area_[r][c] == VISITED_TILE; }
-
+        void set(int posr, int posc, char element);
         void dump() const;
-        static constexpr char UNKNOWN_TILE = '?';
-        static constexpr char WALL_TILE = '#';
-        static constexpr char VISITED_TILE = '.';
+        Area transform(const std::map<char,char>&);
+        bool load(std::ifstream&);
+        bool store(std::ofstream&);
 
     private:
         void extend(int posr, int posc);

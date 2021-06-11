@@ -50,9 +50,9 @@ namespace MazeEscape
     {
         vector<Direction> dirs;
         if (view[0][1] == '-') dirs.push_back(Direction::UP);
-        if (view[1][0] == '-') dirs.push_back(Direction::RIGHT);
+        if (view[1][0] == '-') dirs.push_back(Direction::LEFT);
         if (view[2][1] == '-') dirs.push_back(Direction::DOWN);
-        if (view[1][2] == '-') dirs.push_back(Direction::LEFT);
+        if (view[1][2] == '-') dirs.push_back(Direction::RIGHT);
         return dirs[rand() % dirs.size()];
     }
     void Agent::updatePos(int& posr,int& posc, int dir)
@@ -65,41 +65,41 @@ namespace MazeEscape
         }
     }
     FeatureList_t stick_to_wall = {
-        {"#-?"\
-         "#??"\
-         "#??", Direction::UP},
-        {"?-#"\
-         "??#"\
-         "??#", Direction::UP},
-        {"???"\
-         "-??"\
-         "#??", Direction::LEFT},
-        {"???"\
-         "??-"\
-         "??#", Direction::RIGHT},
-        {"?-?"\
-         "???"\
-         "???", Direction::UP},
-        {"?#?"\
-         "-??"\
-         "???", Direction::LEFT},
-         {"?#?"\
-         "??-"\
-         "???", Direction::RIGHT}
+        {"#-x"\
+         "#xx"\
+         "#xx", Direction::UP},
+        {"x-#"\
+         "xx#"\
+         "xx#", Direction::UP},
+        {"xxx"\
+         "-xx"\
+         "#xx", Direction::LEFT},
+        {"xxx"\
+         "xx-"\
+         "xx#", Direction::RIGHT},
+        {"x-x"\
+         "xxx"\
+         "xxx", Direction::UP},
+        {"x#x"\
+         "-xx"\
+         "xxx", Direction::LEFT},
+         {"x#x"\
+         "xx-"\
+         "xxx", Direction::RIGHT}
     };
     FeatureList_t up_right_left_back = {
-            {"?-?"\
-         "???"\
-         "???", Direction::UP},
-            {"?#?"\
-         "-??"\
-         "???", Direction::LEFT},
-            {"?#?"\
-         "??-"\
-         "???", Direction::RIGHT},
-            {"?#?"\
-         "#?#"\
-         "?-?", Direction::DOWN}
+        {"x-x"\
+         "xxx"\
+         "xxx", Direction::UP},
+         {"x#x"\
+         "-xx"\
+         "xxx", Direction::LEFT},
+         {"x#x"\
+         "xx-"\
+         "xxx", Direction::RIGHT},
+         {"x#x"\
+         "#x#"\
+         "x-x", Direction::DOWN}
     };
     Direction Agent::tryMoveByFeature(const Area& a)
     {
