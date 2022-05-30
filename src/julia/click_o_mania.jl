@@ -1,7 +1,9 @@
 module click_o_mania
 using DataStructures
 export Point2D
-export findPosition,partition,collectGroups,removeGroup,solve,updateColumn,removeColumn,makeGrid,printGrid
+export findPosition,partition,collectGroups,removeGroup,solve,updateColumn,removeColumn
+export makeGrid,printGrid
+export test_new_stuff
 
 mutable struct Point2D{T}
     x::T
@@ -22,15 +24,54 @@ end
 
 const EmptySpace = ' '
 
+PointRing = Ring{Tuple{Int8,Int8}}
+
+mutable struct SearchState
+    grid::Array{Char,2}
+    blocks::BlockList
+end
+
+mutable struct Pool{T}
+    elems::Vector{T}
+end
+
+Pool{T}() where {T} = Pool{T}(Vector{T}())
+
+function allocate!(pool::Pool{T}, makeElem)::T where {T}
+    println("allocate num pool elems ",length(pool.elems))
+    #return ifelse(!isempty(pool.elems), pop!(pool.elems), makeElem())
+    if length(pool.elems) > 0
+        return pop!(pool.elems)
+    else
+        return makeElem()
+    end
+end
+
+function release!(pool::Pool{T},elem::T) where {T}
+    push!(pool.elems,elem)
+end
+
+SearchStatePool = Pool{SearchState}
 mutable struct Workspace
     groups_grid::Array{Int8,2}
-    points::Ring{Tuple{Int8,Int8}}
+    points::PointRing
+    blockDict::BlockDictionary
+    ssPool::SearchStatePool
+end
+Workspace(groups,ring) = Workspace(groups,ring,BlockDictionary(),SearchStatePool())
+
+function makeSearchState(grid)
+    nrows,ncols = size(grid)
+    SearchState( 
+        copy(grid),
+        BlockList(nrows*ncols)
+    )
 end
 
 function partition(grid::Array{Char,2})
     nrow,ncol = size(grid)
     groups = zeros(Int8,nrow,ncol)
-    wrk = Workspace(groups, Ring{Tuple{Int8,Int8}}(nrow*ncol))
+    wrk = Workspace(groups, PointRing(nrow*ncol))
     #points = Vector{Tuple{Int8,Int8}}()
     #sizehint!(points,nrow*ncol)
     partition!(grid,wrk)
@@ -49,6 +90,7 @@ function partition!(grid::Array{Char,2},wrk::Workspace)
             fillGroupFromPosition!(grid,irow,icol,group,wrk)
         end
     end
+    nextGroup # number of groups
 end
 
 const Directions = [(-1,0),(0,-1),(0,1),(1,0)]
@@ -106,22 +148,50 @@ end
 
 function solve(grid)
     nrow,ncol = size(grid)
-    wrk = Workspace(zeros(Int8,nrow,ncol), Ring{Tuple{Int8,Int8}}(nrow*ncol))
-    partition!(grid,wrk)
-    groups = collectGroups(wrk.groups_grid)
+    wrk = Workspace(zeros(Int8,nrow,ncol), PointRing(nrow*ncol))
+    groups = collectGroups(partition(grid))
     _,idx = solveInternal(grid,1,groups,wrk)
     idx != 0 ? groups[idx][1] : nothing
 end
 
-function collectGroups(groups)
-    dgr = Dict( v => [] for v in unique(groups) )
+function test_new_stuff(grid)
+    nrow,ncol = size(grid)
+    wrk = Workspace(zeros(Int8,nrow,ncol), PointRing(nrow*ncol))
+    partition!(grid,wrk)
+    ss = allocate!(wrk.ssPool, ()->makeSearchState(grid))
+    collectGroups!(wrk.groups_grid,wrk.blockDict,ss.blocks)
+    groups = Vector{PositionsVector}()
+    for bg in ss.blocks.blocks
+        push!(groups,@view ss.blocks.positions[bg.first:bg.last])
+    end
+    release!(wrk.ssPool,ss)
+    return groups
+end
+
+function collectGroups(groupMap)
+    dgr = Dict( v => [] for v in unique(groupMap) )
     delete!(dgr,0)
-    nrow,ncol = size(groups)
+    nrow,ncol = size(groupMap)
     for irow in 1:nrow, icol in 1:ncol
-        group = groups[irow,icol]
+        group = groupMap[irow,icol]
         group > 0 && push!( dgr[group], (irow,icol) )
     end
     values(dgr) |> collect
+end
+
+function collectGroups!(groups, blockDict::BlockDictionary, blockList::BlockList)
+    for (k,v) in blockDict
+        empty!(v)
+    end
+    for v in unique(groups)
+        get!(blockDict,v,[])
+    end
+    nrow,ncol = size(groups)
+    for irow in 1:nrow, icol in 1:ncol
+        group = groups[irow,icol]
+        group > 0 && push!( blockDict[group], (irow,icol) )
+    end
+    return fillBlockList!(blockDict,blockList)
 end
 
 function removeGroup(grid,group)
@@ -148,7 +218,15 @@ function updateColumn!(grid,icol)
             grid[1,icol] = EmptySpace
         end
     end
-    (grid[:,icol] .== EmptySpace) |> all
+    #= compact, but allocates
+    (grid[:,icol] .== EmptySpace) |> all =#
+    nonempty = nrow
+    for irow in 1:nrow
+        if grid[irow,icol] == EmptySpace
+            nonempty = nonempty - 1
+        end
+    end
+    return nonempty == 0
 end
 
 function updateColumn(grid,icol)
