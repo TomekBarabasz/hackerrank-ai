@@ -85,9 +85,8 @@ function partition!(grid::Array{Char,2},wrk::Workspace)
     for irow in 1:nrow, icol in 1:ncol
         group = wrk.groups_grid[irow,icol]
         if group == 0 && grid[irow,icol] != EmptySpace
-            group = nextGroup
+            fillGroupFromPosition!(grid,irow,icol,nextGroup,wrk)
             nextGroup = nextGroup + 1
-            fillGroupFromPosition!(grid,irow,icol,group,wrk)
         end
     end
     nextGroup # number of groups
@@ -122,7 +121,7 @@ function stopCondition(groups)
     true
 end
 
-function solveInternal(grid,level,groups::Union{Vector,Nothing},wrk::Workspace)
+function solveInternal(ss::SearchState,level,wrk::Workspace)
     if groups == nothing
         partition!(grid,wrk)
         groups = collectGroups(wrk.groups_grid)
@@ -149,8 +148,10 @@ end
 function solve(grid)
     nrow,ncol = size(grid)
     wrk = Workspace(zeros(Int8,nrow,ncol), PointRing(nrow*ncol))
-    groups = collectGroups(partition(grid))
-    _,idx = solveInternal(grid,1,groups,wrk)
+    partition!(grid,wrk)
+    ss = allocate!(wrk.ssPool, ()->makeSearchState(grid))
+    collectGroups(wrk.groups_grid,wrk.blockDict,ss.blocks)
+    _,idx = solveInternal(ss,1,wrk)
     idx != 0 ? groups[idx][1] : nothing
 end
 
@@ -214,7 +215,7 @@ function updateColumn!(grid,icol)
     nrow = size(grid,1)
     for irow in 2:nrow
         if grid[irow,icol] == EmptySpace
-            grid[2:irow,icol] = grid[1:irow-1,icol]
+            grid[2:irow,icol] = @inbounds grid[1:irow-1,icol]
             grid[1,icol] = EmptySpace
         end
     end

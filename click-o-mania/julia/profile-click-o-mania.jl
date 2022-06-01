@@ -28,6 +28,6 @@ function profile_partition()
 end
 
 solve(grid[1:8,1:8])
-#@profile solve(grid[1:8,1:8])
-#Profile.print()
+@profile solve(grid[1:8,1:8])
+Profile.print()
 

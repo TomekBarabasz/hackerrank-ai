@@ -1,7 +1,3 @@
-module DataStructures
-
-export Ring
-
 mutable struct Ring{T}
     first::Number
     nelem::Number
@@ -22,7 +18,7 @@ end
 function push!(r::Ring{T},elem::T)::Bool where {T}
     r.nelem == r.capacity && return false
     next = r.first + r.nelem
-    idx = ifelse(next <= r.capacity,next,1)
+    idx = ifelse(next <= r.capacity,next,next-r.capacity)
     @inbounds r.table[idx] = elem
     r.nelem = r.nelem + 1
     true
@@ -43,6 +39,4 @@ end
 
 function length(r::Ring{T}) where {T}
     r.nelem
-end
-
 end

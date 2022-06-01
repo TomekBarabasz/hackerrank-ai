@@ -124,20 +124,39 @@ for nrow in 5:NR
     @time partition(grid[1:nrow,:])
 end
 
+grid = makeGrid(["112",
+                 "132",
+                 "122"])
+groups = test_new_stuff(grid)
+println(groups)
+exp_groups = collectGroups(partition(grid))
+println(exp_groups)
+
+#=
 println("timing solve")
 for nrow in 1:7
     @time solve(grid[1:nrow,:])
 end
+=#
 
-#println("profiling partition")
-#@profile (for i in 1:10000 partition(grid); end)
-#Profile.print()
+#=
+println("profiling partition")
+@profile (for i in 1:10000 partition(grid); end)
+Profile.print()
+=#
 
-#println("solving 9x9 grid")
-#@time solve(grid[1:9,1:9])
-#@profile solve(grid[1:9,1:9])
-#Profile.print()
+#=
+println("solving 9x9 grid")
+@time solve(grid[1:9,1:9])
+=#
 
-#for s in 5:9
-#    @time solve(grid[1:s,1:s])
-#end
+#=
+@profile solve(grid[1:9,1:9])
+Profile.print()
+=#
+
+#=
+for s in 5:9
+    @time solve(grid[1:s,1:s])
+end
+=#
