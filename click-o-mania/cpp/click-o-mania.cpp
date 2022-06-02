@@ -7,19 +7,19 @@ using namespace std;
 
 namespace Click_o_mania
 {
-SearchState makeGrid(std::initializer_list<std::string> init)
+SearchState* makeGrid(std::initializer_list<std::string> init)
 {
     static_assert(std::is_same<std::string::value_type,char>::value);
     const int nrow = init.size();
     const int ncol = init.begin()->size();
-    SearchState ss(nrow,ncol);
-    auto *grid = ss.grid;
+    auto *pss = SearchState::alloc(nrow,ncol);
+    auto *grid = pss->grid;
     int8_t tmp[16];
     for( auto &row:init ) {
         memcpy(grid,row.c_str(),row.size());
         grid += row.size();
     }
-    return ss;
+    return pss;
 }
 inline void fillGroupFromPosition(const SearchState& ss, int r0, int c0, int8_t color,int8_t group, Workspace& wrk)
 {
@@ -65,10 +65,39 @@ int partitionGrid(SearchState& ss,Workspace& wrk)
         }
     return nextGroup-1;
 }
-int collectGroups(int nrow,int ncol,const int8_t*group_map, BlockList<int8_t>& blocks)
+void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList<int8_t>& blocks)
 {
-    blocks.ngroups = 0;
+    blocks.ngroups = ngroups;
     blocks.npoints = 0;
-    return 0;
+    const int totSize = nrow*ncol;
+    const int8_t *group_map = wrk.group_map;
+    int16_t* group_count = wrk.group_count;
+    memset(group_count,0,sizeof(int16_t)*(ngroups+1));
+    for(int i=0;i<totSize;++i){
+        ++group_count[ group_map[i] ];
+    }
+    group_count[0] = 0; //group id 0 is invalid
+    for(int i=1;i<=ngroups;++i)
+    {
+        const int first = group_count[i-1];
+        const int nelem = group_count[i];
+        group_count[i] += group_count[i-1];
+        blocks.groups[i-1] = {i,first,nelem};
+    }
+    memset(group_count,0,sizeof(int16_t)*(ngroups+1));
+    group_map = wrk.group_map;
+    for (int r=0;r<nrow;++r)
+        for (int c=0;c<ncol;++c,++group_map)
+        {
+            auto group_id = *group_map;
+            if (*group_map != 0) 
+            {
+                const auto group_idx = *group_map-1;
+                const int pt_idx = get<1>(blocks.groups[group_idx]) + group_count[group_idx];
+                blocks.points[pt_idx] = {r,c};
+                ++group_count[group_idx];
+            }
+        }
 }
+
 }

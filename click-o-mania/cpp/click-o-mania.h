@@ -14,42 +14,57 @@ struct BlockList
     using Group = std::tuple<int16_t,int16_t,int16_t>;
     int16_t npoints,ngroups;
     const size_t Capacity;
-    std::tuple<T,T> *points;
+    const bool Delete;
+    Point *points;
     Group *groups;
-    BlockList(size_t capacity) : Capacity(capacity)
+    BlockList(size_t capacity) : Capacity(capacity), Delete(true)
     {
         points = new Point[Capacity];
         groups = new Group[Capacity];
-        npoints= 0;
-        ngroups= 0;
+        clear();
+    }
+    BlockList(size_t capacity,uint8_t*raw_ptr) : Capacity(capacity), Delete(false)
+    {
+        points = reinterpret_cast<Point*>(raw_ptr);
+        groups = reinterpret_cast<Group*>(raw_ptr + capacity*sizeof(Point));
+        clear();
+    }
+    void clear()
+    {
+        npoints = ngroups = 0;
     }
     ~BlockList()
     {
-        delete[] points;
-        delete[] groups;
+        if (Delete) {
+            delete[] points;
+            delete[] groups;
+        }
     }
 };
 struct SearchState
 {
     int16_t nrow,ncol;
     int8_t    *grid;
-    BlockList<int8_t> *blocks;
+    BlockList<int8_t> blocks;
 
-    static SearchState* makeInstance(const int8_t*grid,int nrow,int ncol)
+    static SearchState* alloc(int nrow,int ncol)
     {
-        const size_t size = nrow*ncol;
-        auto *ss = new SearchState(nrow,ncol);
-        memcpy(ss->grid, grid, size*sizeof(int8_t));
+        const size_t size = nrow*ncol;        
+        const int additional_size = size*sizeof(int8_t) 
+                                  + size*sizeof(decltype(blocks)::Point)
+                                  + size*sizeof(decltype(blocks)::Group);
+        uint8_t *raw = new uint8_t[sizeof(SearchState) + additional_size];
+        auto *ss = new(raw) SearchState(nrow,ncol,raw+sizeof(SearchState));
         return ss;
     }
-    SearchState(int nrow,int ncol) : nrow(nrow),ncol(ncol)
+    SearchState(int nrow,int ncol, uint8_t* raw) : nrow(nrow),ncol(ncol), blocks(nrow*ncol,raw)
     {
-        grid = new int8_t[nrow*ncol];
+        const int size = nrow*ncol;
+        grid = reinterpret_cast<int8_t*>(raw + size*sizeof(decltype(blocks)::Point)
+                                             + size*sizeof(decltype(blocks)::Group));
     }
     ~SearchState()
     {
-        //delete[] reinterpret_cast<int8_t*>(this);
-        delete[] grid;
     }
 };
 template<typename T>
@@ -174,8 +189,8 @@ struct Ref
 
 };
 constexpr int8_t EmptySpace = ' ';
-SearchState makeGrid(std::initializer_list<std::string> init);
+SearchState* makeGrid(std::initializer_list<std::string> init);
 int partitionGrid(SearchState& ss,Workspace& wrk);
-int collectGroups(int nrow,int ncol,const int8_t*group_map, BlockList<int8_t>& blocks);
+void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList<int8_t>& blocks);
 }
 

@@ -14,5 +14,10 @@ add_executable(click-o-mania main.cpp)
 target_link_libraries(click-o-mania click-o-mania-lib stdc++)
 
 add_executable(unit_tests test-click-o-mania.cpp)
+target_compile_options(unit_tests PUBLIC 
+    -fsanitize=address
+    #-fuse-ld=lld
+)
 target_link_libraries(unit_tests click-o-mania-lib gtest gtest_main pthread stdc++)
+target_link_options(unit_tests PUBLIC -fsanitize=address)
 #add_test(unit_tests)
