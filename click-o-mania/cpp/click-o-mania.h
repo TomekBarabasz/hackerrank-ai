@@ -70,14 +70,22 @@ struct SearchState
 template<typename T>
 struct Pool
 {
-    std::vector<T> pool;
+    std::vector<T*> pool;
+    ~Pool()
+    {
+        for (auto p:pool) {
+            delete p;
+        }
+    }
     T* allocate(std::function<T*()> make)
     {
-        if (!pool.empty()){
-            T* e = pool.last();
+        if (!pool.empty())
+        {
+            T* e = pool.back();
             pool.pop_back();
             return e;
-        } else {
+        } 
+        else {
             return make();
         } 
     }
@@ -145,6 +153,7 @@ struct Workspace
     int8_t *group_map;
     int16_t *group_count;
     Int8Ring ring;
+    Pool<SearchState> ss_pool;
     Workspace(int nrow,int ncol) : Nrow(nrow),Ncol(ncol), ring(nrow*ncol), Delete(true)
     {
         const int size = nrow*ncol;
@@ -177,6 +186,10 @@ struct Workspace
         Workspace *wrk = new(raw) Workspace(nrow,ncol,raw+sizeof(Workspace));
         return wrk;
     }
+    SearchState* allocSearchState()
+    {
+        return ss_pool.allocate([nrow=Nrow,ncol=Ncol](){return SearchState::alloc(nrow,ncol);});
+    }
 };
 template<typename T>
 struct Ref
@@ -192,5 +205,9 @@ constexpr int8_t EmptySpace = ' ';
 SearchState* makeGrid(std::initializer_list<std::string> init);
 int partitionGrid(SearchState& ss,Workspace& wrk);
 void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList<int8_t>& blocks);
+SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk);
+bool updateColumn(SearchState& ss,int icol);
+void removeColumn(SearchState& ss, int icol);
+void removeEmptyRows(SearchState& ss);
 }
 

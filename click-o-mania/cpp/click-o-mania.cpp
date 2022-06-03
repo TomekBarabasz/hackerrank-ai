@@ -99,5 +99,84 @@ void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList<int8_
             }
         }
 }
+SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk)
+{
+    auto * newss = wrk.allocSearchState();
+    const auto totSize = ss.nrow*ss.ncol;
+    memcpy(newss->grid,ss.grid,totSize*sizeof(ss.grid[0]));
+    const auto [id,first,nelem] = ss.blocks.groups[group_idx];
+    auto * newgrid = newss->grid;
+    for (int i=0;i<nelem;++i) {
+        const auto [r,c] = ss.blocks.points[first + i];
+        newgrid[r*ss.ncol+c] = EmptySpace;
+    }
+    for (int c=0;c<newss->ncol;)
+    {
+        const bool empty = updateColumn(*newss,c);
+        if (empty)
+        {
+            removeColumn(*newss,c);
+        }else{
+            ++c;
+        }
+    }
+    removeEmptyRows(*newss);
 
+    return newss;
+}
+bool updateColumn(SearchState& ss,int icol)
+{
+    int dest_r = (ss.nrow-1)*ss.ncol+icol,src_r=-1;
+    auto * grid = ss.grid;
+    
+    Next:
+    for(;dest_r >= ss.ncol; dest_r -= ss.ncol)
+        if (grid[dest_r] == EmptySpace)
+        {
+            if (src_r < 0) src_r = dest_r - ss.ncol;
+            for(; src_r >= 0; src_r -= ss.ncol)
+                if (grid[src_r] != EmptySpace)
+                {
+                    grid[dest_r] = grid[src_r];
+                    grid[src_r] = EmptySpace;
+                    dest_r -= ss.ncol;
+                    src_r -= ss.ncol;
+                    goto Next;
+                }
+            goto Exit;
+        }
+    
+    Exit:
+    return grid[ (ss.nrow-1)*ss.ncol + icol] == EmptySpace;
+}
+void removeColumn(SearchState& ss, int icol)
+{
+    int8_t*dst = ss.grid + icol, *src = dst + 1;
+    int cnt = ss.ncol - 1;
+    for (int r=0;r<ss.nrow-1;++r)
+    {
+        memmove(dst,src,cnt*sizeof(ss.grid[0]));
+        dst += cnt;
+        src += cnt+1;
+    }
+    //last row
+    memmove(dst,src,ss.ncol-1-icol);
+    --ss.ncol;
+}
+
+void removeEmptyRows(SearchState& ss)
+{
+    auto *pr = ss.grid;
+    int r;
+    for(r=0;r<ss.nrow; ++r)
+        for(int c=0;c<ss.ncol;++c)
+            if (*pr++ != EmptySpace)
+                goto Exit;
+    Exit:
+    if (r > 0)
+    {
+        memmove(ss.grid,ss.grid+r*(ss.ncol),(ss.nrow-r)*ss.ncol*sizeof(ss.grid[0]));
+        ss.nrow -= r;
+    }
+}
 }
