@@ -9,10 +9,14 @@ link_directories( ${GTEST_LIBRARY_DIRS} )
 add_definitions(${GTEST_CFLAGS_OTHER})
 pkg_check_modules(GTEST REQUIRED gtest>=1.8.1)
 add_library(click-o-mania-lib STATIC click-o-mania.cpp)
-
+target_compile_options(click-o-mania-lib PUBLIC 
+    -O3
+)
 add_executable(click-o-mania main.cpp)
 target_link_libraries(click-o-mania click-o-mania-lib stdc++)
-
+target_compile_options(click-o-mania PUBLIC 
+    -O3
+)
 add_executable(unit_tests test-click-o-mania.cpp)
 target_compile_options(unit_tests PUBLIC 
     -fsanitize=address

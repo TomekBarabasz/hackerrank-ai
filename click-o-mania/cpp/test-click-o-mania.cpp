@@ -3,6 +3,7 @@
 #include "click-o-mania.h"
 
 using namespace Click_o_mania;
+using Pt = BlockList<int8_t>::Point;
 
 TEST(TestRing, test_01)
 {
@@ -95,7 +96,6 @@ TEST(CollectGroups,test_01)
     collectGroups(ss.nrow,ss.ncol,ng,wrk,ss.blocks);
     auto & blocks = ss.blocks;
     ASSERT_EQ(3,blocks.ngroups);
-    using Pt = BlockList<int8_t>::Point;
     //group 1
     {
         auto [id,first,nelem] = blocks.groups[0];
@@ -304,4 +304,37 @@ TEST(removeGroup,test_01)
         ASSERT_EQ(exp[idx], nss->grid[idx]);
     delete pss;
     delete nss;
+}
+TEST(solve,test_01)
+{
+    const auto res = solve({"y  ",
+                            "y  ",
+                            "r  "});
+    ASSERT_EQ(Pt(0,0),res);
+}
+TEST(solve,test_02)
+{
+    const auto res = solve({"b  ",
+                            "y  ",
+                            "bbb",
+                            "ybb"});
+    ASSERT_EQ(Pt(2,0),res);
+}
+TEST(solve,test_03)
+{
+    const auto res = solve({"  b",
+                            "b y",
+                            "yby",
+                            "byy",
+                            "ybb"});
+    ASSERT_EQ(Pt(4,1),res);
+}
+TEST(solve,test_04)
+{
+    const auto res = solve({"brbb",
+                            "rryy",
+                            "yrby",
+                            "brry",
+                            "yrrb"});
+    //ASSERT_EQ(Pt(4,1),res);
 }

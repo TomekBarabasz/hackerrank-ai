@@ -44,13 +44,13 @@ struct BlockList
 struct SearchState
 {
     int16_t nrow,ncol;
-    int8_t    *grid;
+    uint8_t *grid;
     BlockList<int8_t> blocks;
 
     static SearchState* alloc(int nrow,int ncol)
     {
         const size_t size = nrow*ncol;        
-        const int additional_size = size*sizeof(int8_t) 
+        const int additional_size = size*sizeof(uint8_t) 
                                   + size*sizeof(decltype(blocks)::Point)
                                   + size*sizeof(decltype(blocks)::Group);
         uint8_t *raw = new uint8_t[sizeof(SearchState) + additional_size];
@@ -60,7 +60,7 @@ struct SearchState
     SearchState(int nrow,int ncol, uint8_t* raw) : nrow(nrow),ncol(ncol), blocks(nrow*ncol,raw)
     {
         const int size = nrow*ncol;
-        grid = reinterpret_cast<int8_t*>(raw + size*sizeof(decltype(blocks)::Point)
+        grid = reinterpret_cast<uint8_t*>(raw + size*sizeof(decltype(blocks)::Point)
                                              + size*sizeof(decltype(blocks)::Group));
     }
     ~SearchState()
@@ -150,14 +150,14 @@ struct Workspace
 {
     const int Nrow,Ncol;
     const bool Delete;
-    int8_t *group_map;
+    uint8_t *group_map;
     int16_t *group_count;
     Int8Ring ring;
     Pool<SearchState> ss_pool;
     Workspace(int nrow,int ncol) : Nrow(nrow),Ncol(ncol), ring(nrow*ncol), Delete(true)
     {
         const int size = nrow*ncol;
-        group_map = new int8_t[size];
+        group_map = new uint8_t[size];
         group_count = new int16_t[size];
     }
     Workspace(int nrow,int ncol,uint8_t*raw_ptr) : 
@@ -166,7 +166,7 @@ struct Workspace
         Delete(false)
     {
         const int size = nrow*ncol;
-        group_map = reinterpret_cast<int8_t*>(raw_ptr + size * sizeof(Int8Ring::value_type));
+        group_map = reinterpret_cast<uint8_t*>(raw_ptr + size * sizeof(Int8Ring::value_type));
         group_count = reinterpret_cast<int16_t*>(group_map + size * sizeof(int8_t));
     }
     ~Workspace()
@@ -179,8 +179,8 @@ struct Workspace
     static Workspace* make(int nrow,int ncol)
     {
         const int totSize = nrow*ncol;
-        int additional_size = sizeof(int8_t)*totSize    //group_map
-                            + sizeof(int16_t)*totSize
+        int additional_size = sizeof(uint8_t)*totSize    //group_map
+                            + sizeof(int16_t)*(totSize+1)
                             + sizeof(Int8Ring::value_type)*totSize;
         uint8_t *raw = new uint8_t[sizeof(Workspace)+additional_size];
         Workspace *wrk = new(raw) Workspace(nrow,ncol,raw+sizeof(Workspace));
@@ -189,6 +189,10 @@ struct Workspace
     SearchState* allocSearchState()
     {
         return ss_pool.allocate([nrow=Nrow,ncol=Ncol](){return SearchState::alloc(nrow,ncol);});
+    }
+    void releaseSearchState(SearchState *pss)
+    {
+        ss_pool.release(pss);
     }
 };
 template<typename T>
@@ -201,13 +205,16 @@ struct Ref
     T& get() { return *ptr;}
 
 };
-constexpr int8_t EmptySpace = ' ';
+constexpr uint8_t EmptySpace = '-';
 SearchState* makeGrid(std::initializer_list<std::string> init);
-int partitionGrid(SearchState& ss,Workspace& wrk);
+void printGrid(const SearchState& ss);
+int partitionGrid(const SearchState& ss,Workspace& wrk);
 void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList<int8_t>& blocks);
+void sortGroups(BlockList<int8_t>& blocks);
 SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk);
 bool updateColumn(SearchState& ss,int icol);
 void removeColumn(SearchState& ss, int icol);
 void removeEmptyRows(SearchState& ss);
+std::tuple<int8_t,int8_t> solve(std::initializer_list<std::string> init);
 }
 

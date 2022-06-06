@@ -7,21 +7,24 @@ using namespace std;
 
 namespace Click_o_mania
 {
+void initGrid(std::initializer_list<std::string> init,SearchState *pss)
+{
+    auto *grid = pss->grid;
+    for( auto &row:init ) {
+        memcpy(grid,row.c_str(),row.size());
+        grid += row.size();
+    }
+}
 SearchState* makeGrid(std::initializer_list<std::string> init)
 {
     static_assert(std::is_same<std::string::value_type,char>::value);
     const int nrow = init.size();
     const int ncol = init.begin()->size();
     auto *pss = SearchState::alloc(nrow,ncol);
-    auto *grid = pss->grid;
-    int8_t tmp[16];
-    for( auto &row:init ) {
-        memcpy(grid,row.c_str(),row.size());
-        grid += row.size();
-    }
+    initGrid(init,pss);
     return pss;
 }
-inline void fillGroupFromPosition(const SearchState& ss, int r0, int c0, int8_t color,int8_t group, Workspace& wrk)
+inline void fillGroupFromPosition(const SearchState& ss, int r0, int c0, uint8_t color,uint8_t group, Workspace& wrk)
 {
     static constexpr std::tuple<int8_t,int8_t> Directions[4] = {{-1,0},{0,-1},{0,1},{1,0}};
     auto & points = wrk.ring;
@@ -45,14 +48,14 @@ inline void fillGroupFromPosition(const SearchState& ss, int r0, int c0, int8_t 
         }
     }
 }
-int partitionGrid(SearchState& ss,Workspace& wrk)
+int partitionGrid(const SearchState& ss,Workspace& wrk)
 {
     const int nrow = ss.nrow;
     const int ncol = ss.ncol;
-    int8_t nextGroup = 1;
+    uint8_t nextGroup = 1;
     memset(wrk.group_map,0,nrow*ncol);
-    int8_t *group_map = wrk.group_map;
-    int8_t *grid = ss.grid;
+    auto *group_map = wrk.group_map;
+    auto *grid = ss.grid;
     for (int r=0;r<nrow;++r)
         for(int c=0;c<ncol;++c)
         {
@@ -70,7 +73,7 @@ void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList<int8_
     blocks.ngroups = ngroups;
     blocks.npoints = 0;
     const int totSize = nrow*ncol;
-    const int8_t *group_map = wrk.group_map;
+    const auto *group_map = wrk.group_map;
     int16_t* group_count = wrk.group_count;
     memset(group_count,0,sizeof(int16_t)*(ngroups+1));
     for(int i=0;i<totSize;++i){
@@ -98,10 +101,20 @@ void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList<int8_
                 ++group_count[group_idx];
             }
         }
+    sortGroups(blocks);
+}
+void sortGroups(BlockList<int8_t>& blocks)
+{
+    auto *begin = blocks.groups;
+    auto *end = blocks.groups + blocks.ngroups;
+    using Group = BlockList<int8_t>::Group;
+    std::sort(begin,end,[](const Group&a, const Group&b){ return get<2>(a) > get<2>(b);});
 }
 SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk)
 {
     auto * newss = wrk.allocSearchState();
+    newss->nrow = ss.nrow;
+    newss->ncol = ss.ncol;
     const auto totSize = ss.nrow*ss.ncol;
     memcpy(newss->grid,ss.grid,totSize*sizeof(ss.grid[0]));
     const auto [id,first,nelem] = ss.blocks.groups[group_idx];
@@ -151,7 +164,7 @@ bool updateColumn(SearchState& ss,int icol)
 }
 void removeColumn(SearchState& ss, int icol)
 {
-    int8_t*dst = ss.grid + icol, *src = dst + 1;
+    auto *dst = ss.grid + icol, *src = dst + 1;
     int cnt = ss.ncol - 1;
     for (int r=0;r<ss.nrow-1;++r)
     {
@@ -163,7 +176,6 @@ void removeColumn(SearchState& ss, int icol)
     memmove(dst,src,ss.ncol-1-icol);
     --ss.ncol;
 }
-
 void removeEmptyRows(SearchState& ss)
 {
     auto *pr = ss.grid;
@@ -178,5 +190,68 @@ void removeEmptyRows(SearchState& ss)
         memmove(ss.grid,ss.grid+r*(ss.ncol),(ss.nrow-r)*ss.ncol*sizeof(ss.grid[0]));
         ss.nrow -= r;
     }
+}
+bool stopConditionReached(SearchState& ss)
+{
+    for (int gi=0;gi<ss.blocks.ngroups;++gi)
+        if (get<2>(ss.blocks.groups[gi]) > 1)
+            return false;
+    return true;
+}
+void printGrid(const SearchState& ss)
+{
+    auto * grid = ss.grid;
+    for(int r=0;r<ss.nrow;++r) {
+        for (int c=0;c<ss.ncol;++c) printf("%c",*grid++);
+        printf("\n");
+    }
+}
+//return [points, group_index]
+std::tuple<int,int> solveInternal(SearchState& ss,Workspace& wrk,int level)
+{
+    const int ngroups = partitionGrid(ss,wrk);
+    //printf("level %d grid (%d,%d) groups %d\n",level,ss.nrow,ss.ncol,ngroups);
+    collectGroups(ss.nrow,ss.ncol,ngroups,wrk,ss.blocks);
+    if (stopConditionReached(ss))
+    {
+        printf("\rlevel %d pts %d",level,ss.blocks.ngroups);
+        return {ss.blocks.ngroups,0};
+    }
+    else
+    {
+        int min_gi = -1;
+        int min_pts = 255;
+        for (int gi=0;gi<ss.blocks.ngroups;++gi)
+        {
+            auto [id,first,nelem] = ss.blocks.groups[gi];
+            if (nelem > 1)
+            {
+                auto *nss = removeGroup(ss,gi,wrk);
+                auto [pts,x] = solveInternal(*nss,wrk,level+1);
+                wrk.releaseSearchState(nss);
+                if (pts < min_pts)
+                {
+                    if (0==pts) [[unlikely]]
+                    {
+                        return {0,gi};
+                    } else {
+                        min_pts = pts;
+                        min_gi = gi;
+                    }
+                }
+            }
+        }
+        return {min_pts,min_gi};
+    }
+}
+std::tuple<int8_t,int8_t> solve(std::initializer_list<std::string> init)
+{
+    Workspace wrk = Workspace(init.size(),init.begin()->size());
+    auto *pss = wrk.allocSearchState();
+    initGrid(init,pss);
+    auto [points,group_idx] = solveInternal(*pss,wrk,1);
+    auto res = pss->blocks.points[ get<1>(pss->blocks.groups[group_idx]) ];
+    wrk.releaseSearchState(pss);
+    return res;
 }
 }
