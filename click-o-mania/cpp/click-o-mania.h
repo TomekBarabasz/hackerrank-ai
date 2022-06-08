@@ -5,6 +5,8 @@
 #include <string>
 #include <cstring>
 
+#define ALIGNED(x) __attribute__((aligned(x)))
+
 namespace Click_o_mania
 {
 template<typename T>
