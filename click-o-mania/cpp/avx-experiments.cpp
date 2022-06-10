@@ -7,7 +7,8 @@
 #include <gtest/gtest.h>
 #include <tuple>
 
-#define ALIGNED(x) __attribute__((aligned(x)))
+#include "click-o-mania.h"
+
 using namespace std;
 
 inline void copyTo(const __m256i& src, void *dst) { _mm256_store_si256(( __m256i*)dst, src); }
@@ -72,15 +73,6 @@ void printArr(const char* title,const T *ptr, size_t size)
 }
 namespace Click_o_mania
 {
-//NOTE: coords order is columns,rows (to be loaded by _epi32 -> yielding r,c in avx registers)
-template<typename T>
-struct Point {
-    T r,c;
-    Point() : r(0),c(0) {}
-    Point(int r,int c) : r ((T)r), c((T)c) {}
-    bool operator==(const Point& other) const { return r==other.r && c==other.c;}
-};
-using Point16_t = Point<int16_t>;
 
 inline __m256i _mm256_i32gather_epi8 (int const* base_addr, __m256i vindex)
 {
@@ -96,13 +88,13 @@ T _mm_load(void*ptr) { return _mm256_load_si256(reinterpret_cast<__m256i const*>
 template<typename T>
 void _mm_store(const T & val, void*ptr) { _mm256_store_si256(reinterpret_cast<__m256i*>(ptr),val); }
 
-inline __m256i _mm_load(const Point16_t * pt)
+inline __m256i _mm_load(const Point * pt)
 {
     auto mmPt = _mm256_set1_epi32(*reinterpret_cast<const int*>(pt));
     return _mm256_or_si256( _mm256_srli_epi32(mmPt,16), _mm256_slli_epi32(mmPt,16) );
 }
 
-inline __m256i _mm_load(const Point16_t & pt1, const Point16_t & pt2)
+inline __m256i _mm_load(const Point & pt1, const Point & pt2)
 {
     auto pts = _mm256_permute2f128_si256(_mm256_set1_epi32(*reinterpret_cast<const int*>(&pt1)), _mm256_set1_epi32(*reinterpret_cast<const int*>(&pt2)),0x21);
     return _mm256_or_si256( _mm256_srli_epi32(pts,16), _mm256_slli_epi32(pts,16) );
@@ -114,7 +106,7 @@ inline __m256i _mm_load(const Point16_t & pt1, const Point16_t & pt2)
  * return points {{row,col} x8}, valid
  */
 
-inline std::tuple<__m256i,__m256i> generateNeighbours(Point16_t pts[2],__m256i dim,__m256i dirs)
+inline std::tuple<__m256i,__m256i> generateNeighbours(Point pts[2],__m256i dim,__m256i dirs)
 {
     auto rc = _mm_load(pts[0], pts[1]);
     //print<__m256i,int16_t>("rc",rc);
@@ -129,15 +121,15 @@ inline std::tuple<__m256i,__m256i> generateNeighbours(Point16_t pts[2],__m256i d
     return {rc,valid};
 }
 
-struct Wrkspace
+struct Scratchpad
 {
     __m256i dim;
     __m256i dirs;
     int32_t pt_idx[8], pt_valid[8];
-    Point16_t pt_rc[8];
+    Point pt_rc[8];
 };
 
-inline void process2points(Point16_t inp[2], int8_t color, const int8_t * grid, uint8_t * group_map, Wrkspace& wrk)
+inline void process2points(Point inp[2], int8_t color, const uint8_t * grid, uint8_t * group_map, Scratchpad& wrk)
 {
     auto [rc,valid] = generateNeighbours(inp,wrk.dim,wrk.dirs);
     auto r = _mm256_blend_epi16(rc,_mm256_setzero_si256(),0b10101010);
@@ -158,34 +150,45 @@ inline void process2points(Point16_t inp[2], int8_t color, const int8_t * grid, 
     _mm256_store_si256((__m256i*)wrk.pt_rc,rc);
 }
 
-inline void fillGroupFromPositionAVX(int16_t nrow,int16_t ncol, int16_t r0, int16_t c0, uint8_t color,uint8_t group, const int8_t * grid, uint8_t * group_map)
+//NOTE: dim = {nrow-1,ncol-1}
+inline void fillGroupFromPositionAVX(const SearchState& ss, Point & dim, Point & seed, uint8_t color,uint8_t group, Workspace& wrk)
 {
-    vector<Point16_t> queue;
-    Point16_t dim = {nrow-1,ncol-1};
-    Point16_t inp[2];
-    ALIGNED(32) Wrkspace wrk;
-    wrk.dim = _mm_load(&dim);
-    wrk.dirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
+    auto & ring = wrk.ring;
+    //vector<Point2x> ring;
+    Point2x pts;
+    Point dummy={-2,-2};
+    int npts=0;
+    ALIGNED(32) Scratchpad scr;
+    scr.dim = _mm_load(&dim);
+    scr.dirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
 
-    inp[0] = {r0,c0};
-    queue.push_back(inp[0]);
-    while (!queue.empty())
+    ring.push_back( Point2x{{seed,dummy}} );
+    wrk.group_map[ seed.r*ss.ncol+seed.c ] = group;
+    while (!ring.empty())
     {
-        inp[0] = queue.back();
-        queue.pop_back();
-        if (!queue.empty()) {
-            inp[1] = queue.back();
-            queue.pop_back();
-        } else {
-            inp[1] = {nrow,ncol};
+        auto pt2 = ring.popfirst();
+        process2points(pt2.arr, color, ss.grid, wrk.group_map, scr);
+        for(int i=0;i<8;++i)
+            if (scr.pt_valid[i])
+            {
+                pts.arr[npts++]=scr.pt_rc[i];
+                wrk.group_map[ scr.pt_idx[i] ] = group;
+                if (2==npts) {
+                    ring.push_back(pts);
+                    npts = 0;
+                }
+            }
+        if (ring.empty() && 1==npts){
+            pts.arr[1] = dummy;
+            ring.push_back(pts);
+            npts = 0;
         }
-        process2points(inp, color, grid, group_map, wrk);
     }
 }
 
-auto gatherValidPoints(Wrkspace& outp)
+auto gatherValidPoints(Scratchpad& outp)
 {
-    std::vector<Point16_t> queue;
+    std::vector<Point> queue;
     for (int i=0;i<8;++i)
         if (outp.pt_valid[i])
         {
@@ -194,11 +197,11 @@ auto gatherValidPoints(Wrkspace& outp)
     return queue;
 }
 
-Point16_t operator+(const Point16_t& a, const Point16_t& b)
+Point operator+(const Point& a, const Point& b)
 {
     return {a.r+b.r,a.c+b.c};
 }
-Point16_t swap(const Point16_t & p)
+Point swap(const Point & p)
 {
     return {p.c,p.r};
 }
@@ -242,19 +245,19 @@ TEST(AVX, test_i32gather_epi8)
 }
 TEST(AVX, test_coords_valid_nonneg)
 {
-    Point16_t input[] = {{0,0},{1,1}};
-    Point16_t dim = {9,9};
+    Point input[] = {{0,0},{1,1}};
+    Point dim = {9,9};
     auto mmDirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
 
     auto [mm_rc, mm_valid] = generateNeighbours(input, _mm_load(&dim), mmDirs);
-    ALIGNED(32) Point16_t rc[8];
+    ALIGNED(32) Point rc[8];
     ALIGNED(32) int32_t valid[8];
     _mm_store(mm_rc,rc);
     _mm_store(mm_valid,valid);
 
-    const Point16_t dirs[]  = {{-1,0},{0,-1},{0,1},{1,0}};
+    const Point dirs[]  = {{-1,0},{0,-1},{0,1},{1,0}};
 
-    Point16_t & p0 = input[0];
+    Point & p0 = input[0];
     for (int i=0;i<4;++i)
     {
         auto p = p0 + dirs[i];
@@ -265,7 +268,7 @@ TEST(AVX, test_coords_valid_nonneg)
         ASSERT_EQ(coords_valid,valid[i]);
     }
 
-    Point16_t & p1 = input[1];
+    Point & p1 = input[1];
     for (int i=0;i<4;++i)
     {
         auto p = p1 + dirs[i];
@@ -279,8 +282,8 @@ TEST(AVX, test_coords_valid_nonneg)
 TEST(AVX, test_coords_valid_ltmax)
 {
     //must be reverted!   c r   c r
-    Point16_t input[] = {{9,1},{1,9}}; 
-    Point16_t dim = {9,9};  //{ncol-1, nrow-1}
+    Point input[] = {{9,1},{1,9}}; 
+    Point dim = {9,9};  //{ncol-1, nrow-1}
     auto mmDirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
 
     auto [mm_rc,mm_valid] = generateNeighbours(input,_mm_load(&dim),mmDirs);
@@ -336,12 +339,12 @@ TEST(AVX, test_coords_valid_ltmax)
 }*/
 TEST(AVX, test_process2points)
 {
-    static ALIGNED(32) int8_t grid[] = {1,1,2, 1,3,2, 1,2,2};
+    static ALIGNED(32) uint8_t grid[] = {1,1,2, 1,3,2, 1,2,2};
     static ALIGNED(32) uint8_t group_map[] = {0};
     const int nrow=3,ncol=3;
-    Point16_t input[] = {{0,0},{3,3}};  //col,row order!
-    Point16_t dim = {ncol-1,nrow-1};
-    Wrkspace wrk;
+    Point input[] = {{0,0},{3,3}};  //col,row order!
+    Point dim = {ncol-1,nrow-1};
+    Scratchpad wrk;
     wrk.dim = _mm_load(&dim);
     wrk.dirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
 
@@ -353,8 +356,8 @@ TEST(AVX, test_process2points)
 
     auto pts = gatherValidPoints(wrk);
     ASSERT_EQ(2, pts.size());
-    ASSERT_EQ(Point16_t(0,1), pts[0]);
-    ASSERT_EQ(Point16_t(1,0), pts[1]);
+    ASSERT_EQ(Point(0,1), pts[0]);
+    ASSERT_EQ(Point(1,0), pts[1]);
 
     ASSERT_EQ(1, wrk.pt_idx[2]);
     ASSERT_EQ(3, wrk.pt_idx[3]);
@@ -364,7 +367,7 @@ TEST(AVX, test_process2points)
     {
         if (wrk.pt_valid[i])
         {
-            auto & p = *reinterpret_cast<Point16_t*>(wrk.pt_rc + i);
+            auto & p = *reinterpret_cast<Point*>(wrk.pt_rc + i);
             printf("(%d,%d,idx %d) ",p.r, p.c, wrk.pt_idx[i]);
         }
     }
@@ -374,8 +377,8 @@ TEST(AVX, test_process2points)
     process2points(input, 2, grid, group_map, wrk);
     pts = gatherValidPoints(wrk);
     ASSERT_EQ(2, pts.size());
-    ASSERT_EQ(Point16_t(1,2), pts[0]);
-    ASSERT_EQ(Point16_t(2,1), pts[1]);
+    ASSERT_EQ(Point(1,2), pts[0]);
+    ASSERT_EQ(Point(2,1), pts[1]);
 
     ASSERT_EQ(5, wrk.pt_idx[0]);
     ASSERT_EQ(7, wrk.pt_idx[1]);
@@ -385,7 +388,7 @@ TEST(AVX, test_process2points)
     {
         if (wrk.pt_valid[i])
         {
-            auto & p = *reinterpret_cast<Point16_t*>(wrk.pt_rc + i);
+            auto & p = *reinterpret_cast<Point*>(wrk.pt_rc + i);
             printf("(%d,%d,idx %d) ",p.r, p.c, wrk.pt_idx[i]);
         }
     }
@@ -395,4 +398,50 @@ TEST(AVX, test_process2points)
     process2points(input, 3, grid, group_map, wrk);
     pts = gatherValidPoints(wrk);
     ASSERT_EQ(0, pts.size());
+}
+TEST(AVX, test_fillGroupFromPosition)
+{
+    uint8_t grid[] = {1,1,2, 1,3,2, 1,2,2};
+
+    const int nrow=3,ncol=3;
+    const int totSize = nrow*ncol;
+    Point seed = {0,0};
+    Point dim = {ncol-1,nrow-1};
+
+    Workspace wrk(nrow,ncol);
+    auto pss = SearchState::alloc(nrow,ncol);
+    memcpy(pss->grid,grid,sizeof(grid[0])*totSize);
+    wrk.clearGroupMap(totSize);
+
+    fillGroupFromPositionAVX(*pss, dim, seed, 1,1, wrk);
+
+    const uint8_t exp_groups[] = {1,1,0,1,0,0,1,0,0};
+    for (int i=0;i<totSize;++i)
+        ASSERT_EQ(exp_groups[i], wrk.group_map[i]);
+
+    delete pss;
+}
+TEST(AVX, test_fillGroupFromPosition_2)
+{
+    const int nrow=5,ncol=5;
+    const int totSize = nrow*ncol;
+    Point seed = {0,0};
+    Point dim = {ncol-1,nrow-1};
+
+    Workspace wrk(nrow,ncol);
+    auto * pss= makeGrid({  "11122",
+                            "31344",
+                            "33354",
+                            "67855",
+                            "68795"});
+
+    wrk.clearGroupMap(totSize);
+
+    fillGroupFromPositionAVX(*pss, dim, seed, 1,1, wrk);
+
+    const uint8_t exp_groups[] = {1,1,1,0,0, 0,1,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0};
+    for (int i=0;i<totSize;++i)
+        ASSERT_EQ(exp_groups[i], wrk.group_map[i]);
+
+    delete pss;
 }

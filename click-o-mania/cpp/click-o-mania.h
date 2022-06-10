@@ -10,32 +10,43 @@
 namespace Click_o_mania
 {
 template<typename T>
-struct BlockList
+struct Point_t 
 {
-    using Point = std::tuple<T,T>;
-    using Group = std::tuple<int16_t,int16_t,int16_t>;
+    using value_type = T;
+    T r,c;
+    Point_t() : r(0),c(0) {}
+    Point_t(int r,int c) : r ((T)r), c((T)c) {}
+    bool operator==(const Point_t& other) const { return r==other.r && c==other.c;}
+};
+using Point = Point_t<int16_t>;
+
+template<typename Point>
+struct BlockList_t
+{
+    using Point_t = Point;
+    using Group_t = std::tuple<int16_t,int16_t,int16_t>;
     int16_t npoints,ngroups;
     const size_t Capacity;
     const bool Delete;
-    Point *points;
-    Group *groups;
-    BlockList(size_t capacity) : Capacity(capacity), Delete(true)
+    Point_t *points;
+    Group_t *groups;
+    BlockList_t(size_t capacity) : Capacity(capacity), Delete(true)
     {
-        points = new Point[Capacity];
-        groups = new Group[Capacity];
+        points = new Point_t[Capacity];
+        groups = new Group_t[Capacity];
         clear();
     }
-    BlockList(size_t capacity,uint8_t*raw_ptr) : Capacity(capacity), Delete(false)
+    BlockList_t(size_t capacity,uint8_t*raw_ptr) : Capacity(capacity), Delete(false)
     {
-        points = reinterpret_cast<Point*>(raw_ptr);
-        groups = reinterpret_cast<Group*>(raw_ptr + capacity*sizeof(Point));
+        points = reinterpret_cast<Point_t*>(raw_ptr);
+        groups = reinterpret_cast<Group_t*>(raw_ptr + capacity*sizeof(Point_t));
         clear();
     }
     void clear()
     {
         npoints = ngroups = 0;
     }
-    ~BlockList()
+    ~BlockList_t()
     {
         if (Delete) {
             delete[] points;
@@ -43,29 +54,31 @@ struct BlockList
         }
     }
 };
-struct SearchState
+using BlockList = BlockList_t<Point>;
+template<typename Point,typename T>
+struct SearchState_t
 {
     int16_t nrow,ncol;
-    uint8_t *grid;
-    BlockList<int8_t> blocks;
+    T *grid;
+    BlockList blocks;
 
-    static SearchState* alloc(int nrow,int ncol)
+    static SearchState_t* alloc(int nrow,int ncol)
     {
         const size_t size = nrow*ncol;        
-        const int additional_size = size*sizeof(uint8_t) 
-                                  + size*sizeof(decltype(blocks)::Point)
-                                  + size*sizeof(decltype(blocks)::Group);
-        uint8_t *raw = new uint8_t[sizeof(SearchState) + additional_size];
-        auto *ss = new(raw) SearchState(nrow,ncol,raw+sizeof(SearchState));
+        const int additional_size = size*sizeof(T) 
+                                  + size*sizeof(Point)
+                                  + size*sizeof(decltype(blocks)::Group_t);
+        uint8_t *raw = new uint8_t[sizeof(SearchState_t) + additional_size];
+        auto *ss = new(raw) SearchState_t(nrow,ncol,raw+sizeof(SearchState_t));
         return ss;
     }
-    SearchState(int nrow,int ncol, uint8_t* raw) : nrow(nrow),ncol(ncol), blocks(nrow*ncol,raw)
+    SearchState_t(int nrow,int ncol, uint8_t* raw) : nrow(nrow),ncol(ncol), blocks(nrow*ncol,raw)
     {
         const int size = nrow*ncol;
-        grid = reinterpret_cast<uint8_t*>(raw + size*sizeof(decltype(blocks)::Point)
-                                             + size*sizeof(decltype(blocks)::Group));
+        grid = reinterpret_cast<T*>(raw + size*sizeof(BlockList::Point_t)
+                                        + size*sizeof(BlockList::Group_t));
     }
-    ~SearchState()
+    ~SearchState_t()
     {
     }
 };
@@ -96,24 +109,24 @@ struct Pool
     }
 };
 template <typename T>
-struct Ring
+struct Ring_t
 {
     const int Capacity;
     const bool Delete;
     using value_type=T;
     T* array;
     int first,nelem;
-    Ring(int capacity) : Capacity(capacity),Delete(true)
+    Ring_t(int capacity) : Capacity(capacity),Delete(true)
     {
         array = new T[capacity];
         clear();
     }
-    Ring(int capacity,T*array_) : Capacity(capacity),Delete(false)
+    Ring_t(int capacity,T*array_) : Capacity(capacity),Delete(false)
     {
         array = array_;
         clear();
     }
-    ~Ring() 
+    ~Ring_t() 
     { 
         if (Delete){
             delete[] array;
@@ -123,7 +136,7 @@ struct Ring
     {
         first = nelem = 0;
     }
-    bool push(const T&& elem)
+    bool push_back(const T& elem)
     {
         if (nelem >= Capacity) return false;
         auto next = first + nelem;
@@ -147,15 +160,27 @@ struct Ring
     }
     size_t size() const { return nelem; }
 };
-using Int8Ring = Ring<std::tuple<int8_t,int8_t>>;
+
+struct Point2x
+{
+    Point arr[2];
+};
+
+using Ring = Ring_t<Point2x>;
+using SearchState = SearchState_t<Point,uint8_t>;
+
 struct Workspace
 {
+    using GroupMap_t = uint8_t;
+    using GroupCount_t = int16_t;
     const int Nrow,Ncol;
     const bool Delete;
-    uint8_t *group_map;
-    int16_t *group_count;
-    Int8Ring ring;
+    GroupMap_t *group_map;
+    GroupCount_t *group_count;
+    Ring ring;
     Pool<SearchState> ss_pool;
+    ALIGNED(32) Point::value_type directions[16];
+
     Workspace(int nrow,int ncol) : Nrow(nrow),Ncol(ncol), ring(nrow*ncol), Delete(true)
     {
         const int size = nrow*ncol;
@@ -164,12 +189,12 @@ struct Workspace
     }
     Workspace(int nrow,int ncol,uint8_t*raw_ptr) : 
         Nrow(nrow),Ncol(ncol), 
-        ring(nrow*ncol,reinterpret_cast<Int8Ring::value_type*>(raw_ptr)), 
+        ring(nrow*ncol,reinterpret_cast<Ring::value_type*>(raw_ptr)), 
         Delete(false)
     {
         const int size = nrow*ncol;
-        group_map = reinterpret_cast<uint8_t*>(raw_ptr + size * sizeof(Int8Ring::value_type));
-        group_count = reinterpret_cast<int16_t*>(group_map + size * sizeof(int8_t));
+        group_map = reinterpret_cast<GroupMap_t*>(raw_ptr + size * sizeof(Ring::value_type));
+        group_count = reinterpret_cast<GroupCount_t*>(group_map + calcGroupMapSize(size));
     }
     ~Workspace()
     {
@@ -178,12 +203,16 @@ struct Workspace
             delete[] group_count;
         }
     }
+    static constexpr size_t calcGroupMapSize(size_t nelem)
+    {
+        return ((sizeof(GroupMap_t)*nelem + 3)/4)*4;
+    }
     static Workspace* make(int nrow,int ncol)
     {
         const int totSize = nrow*ncol;
-        int additional_size = sizeof(uint8_t)*totSize    //group_map
-                            + sizeof(int16_t)*(totSize+1)
-                            + sizeof(Int8Ring::value_type)*totSize;
+        int additional_size = calcGroupMapSize(totSize)
+                            + sizeof(GroupCount_t)*(totSize+1)
+                            + sizeof(Ring::value_type)*totSize;
         uint8_t *raw = new uint8_t[sizeof(Workspace)+additional_size];
         Workspace *wrk = new(raw) Workspace(nrow,ncol,raw+sizeof(Workspace));
         return wrk;
@@ -196,27 +225,35 @@ struct Workspace
     {
         ss_pool.release(pss);
     }
+    void clearGroupMap(size_t nelem)
+    {
+        memset(group_map,0,sizeof(GroupMap_t)*nelem);
+    }
+    void clearGroupCount(size_t nelem)
+    {
+        memset(group_count,0,sizeof(GroupCount_t)*nelem);
+    }
 };
-template<typename T>
-struct Ref
-{
-    T *ptr;
-    Ref(T*ptr) : ptr(ptr) {}
-    ~Ref() { delete ptr;ptr=nullptr;}
-    operator T() { return *ptr;}
-    T& get() { return *ptr;}
 
-};
+template<typename T>
+void printIntGrid(const T* grid, int nrow, int ncol)
+{
+    for(int r=0;r<nrow;++r) {
+        for (int c=0;c<ncol;++c) printf("%d",*grid++);
+        printf("\n");
+    }
+}
+
 constexpr uint8_t EmptySpace = '-';
 SearchState* makeGrid(std::initializer_list<std::string> init);
 void printGrid(const SearchState& ss);
 int partitionGrid(const SearchState& ss,Workspace& wrk);
-void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList<int8_t>& blocks);
-void sortGroups(BlockList<int8_t>& blocks);
+void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList& blocks);
+void sortGroups(BlockList& blocks);
 SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk);
 bool updateColumn(SearchState& ss,int icol);
 void removeColumn(SearchState& ss, int icol);
 void removeEmptyRows(SearchState& ss);
-std::tuple<int8_t,int8_t> solve(std::initializer_list<std::string> init);
+Point solve(std::initializer_list<std::string> init);
 }
 
