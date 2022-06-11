@@ -62,6 +62,9 @@ struct SearchState_t
     T *grid;
     BlockList blocks;
 
+    static constexpr int ColorMask   = (1<<(std::numeric_limits<T>::digits/2))-1;
+    static constexpr int GroupShift = std::numeric_limits<T>::digits/2;
+
     static SearchState_t* alloc(int nrow,int ncol)
     {
         const size_t size = nrow*ncol;        
@@ -78,8 +81,32 @@ struct SearchState_t
         grid = reinterpret_cast<T*>(raw + size*sizeof(BlockList::Point_t)
                                         + size*sizeof(BlockList::Group_t));
     }
-    ~SearchState_t()
+    ~SearchState_t() {}
+    T gridAt(int idx) const { return grid[idx] & ColorMask; }
+    T gridAt(int r, int c) const  { return gridAt(r * ncol + c); }
+    T groupAt(int idx) const { return grid[idx] >> GroupShift; }
+    T groupAt(int r, int c) const { return groupAt(r * ncol + c); }
+    void setGroupAt(int idx, T group_id) { grid[idx] |= group_id << GroupShift; }
+    void setGroupAt(int r, int c, T group_id) { setGroupAt(r*ncol+c,group_id); }
+    std::tuple<T,T> getAt(int idx) 
+    { 
+        T v = grid[idx];
+        return { v & ColorMask, v >> GroupShift };
+    }
+    std::tuple<T,T> getAt(int r, int c) { return getAt(r*ncol+c);}
+    void printColorGrid() const
     {
+        for (int r=0;r<nrow;++r) {
+            for (int c=0;c<ncol;++c) printf("%d ", gridAt(r,c));
+            printf("\n");
+        }
+    }
+    void printGroupsGrid() const
+    {
+        for (int r=0;r<nrow;++r) {
+            for (int c=0;c<ncol;++c) printf("%d ", groupAt(r,c));
+            printf("\n");
+        }
     }
 };
 template<typename T>
@@ -167,7 +194,7 @@ struct Point2x
 };
 
 using Ring = Ring_t<Point2x>;
-using SearchState = SearchState_t<Point,uint8_t>;
+using SearchState = SearchState_t<Point,uint32_t>;
 
 struct Workspace
 {
@@ -235,20 +262,11 @@ struct Workspace
     }
 };
 
-template<typename T>
-void printIntGrid(const T* grid, int nrow, int ncol)
-{
-    for(int r=0;r<nrow;++r) {
-        for (int c=0;c<ncol;++c) printf("%d",*grid++);
-        printf("\n");
-    }
-}
-
 constexpr uint8_t EmptySpace = '-';
 SearchState* makeGrid(std::initializer_list<std::string> init);
 void printGrid(const SearchState& ss);
-int partitionGrid(const SearchState& ss,Workspace& wrk);
-void collectGroups(int nrow,int ncol,int groups,Workspace& wrk, BlockList& blocks);
+int partitionGrid(SearchState& ss,Workspace& wrk);
+void collectGroups(SearchState& ss,int groups,Workspace& wrk, BlockList& blocks);
 void sortGroups(BlockList& blocks);
 SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk);
 bool updateColumn(SearchState& ss,int icol);

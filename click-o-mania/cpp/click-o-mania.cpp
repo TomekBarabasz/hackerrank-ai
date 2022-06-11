@@ -12,9 +12,11 @@ namespace Click_o_mania
 void initGrid(std::initializer_list<std::string> init,SearchState *pss)
 {
     auto *grid = pss->grid;
-    for( auto &row:init ) {
-        memcpy(grid,row.c_str(),row.size());
-        grid += row.size();
+    int idx=0;
+    for( auto &row : init ) {
+        for (auto c : row) {
+            grid[idx++] = c;
+        }
     }
 }
 SearchState* makeGrid(std::initializer_list<std::string> init)
@@ -51,17 +53,14 @@ template<typename T>
 T _mm_load(void*ptr) { return _mm256_load_si256(reinterpret_cast<__m256i const*>(ptr)); }
 template<typename T>
 void _mm_store(const T & val, void*ptr) { _mm256_store_si256(reinterpret_cast<__m256i*>(ptr),val); }
-
 inline __m256i _mm_load(const Point * pt)
 {
     return _mm256_set1_epi32(*reinterpret_cast<const int*>(pt));
 }
-
 inline __m256i _mm_load(const Point & pt1, const Point & pt2)
 {
     return _mm256_permute2f128_si256(_mm256_set1_epi32(*reinterpret_cast<const int*>(&pt1)), _mm256_set1_epi32(*reinterpret_cast<const int*>(&pt2)),0x21);
 }
-
 inline void copyTo(const __m256i& src, void *dst) { _mm256_store_si256(( __m256i*)dst, src); }
 template <typename T, typename U=int32_t>
 void print(const char* title, const T & val)
@@ -93,42 +92,40 @@ struct Scratchpad
 {
     __m256i dim;
     __m256i dirs;
-    int32_t pt_valid[8], pt_idx32[8], group_upd[8];
+    int32_t pt_valid[8], pt_idx[8], grid_upd[8];
     Point pt_rc[8];
 };
 
-inline void process2points(Point inp[2], int8_t color, int group_id, const uint8_t * grid, uint8_t * group_map, Scratchpad& wrk)
+inline void process2points(Point inp[2], int color, int group_id, uint32_t * grid_group, Scratchpad& wrk)
 {
     auto [rc,valid] = generateNeighbours(inp,wrk.dim,wrk.dirs);
     auto r = _mm256_blend_epi16(rc,_mm256_setzero_si256(),0b10101010);
     auto c = _mm256_srli_epi32(_mm256_blend_epi16(rc,_mm256_setzero_si256(),0b01010101),16);
     auto ncols = _mm256_add_epi32(_mm256_srli_epi32(wrk.dim,16),_mm256_set1_epi32(1));
-    auto idx = _mm256_add_epi32(c, _mm256_mullo_epi32(r, ncols));
-    idx = _mm256_and_si256(idx,valid);
+    auto index = _mm256_add_epi32(c, _mm256_mullo_epi32(r, ncols));
+    index = _mm256_and_si256(index,valid);
 
-    auto v32index = _mm256_srli_epi32(idx,2);
-    auto shift = _mm256_slli_epi32(_mm256_and_si256(idx, _mm256_set1_epi32(3)),3);
-    auto mask = _mm256_set1_epi32(0xff);
-    auto colors = _mm256_i32gather_epi32(reinterpret_cast<const int*>(grid), v32index, 4);
-    auto groups = _mm256_i32gather_epi32(reinterpret_cast<const int*>(group_map), v32index, 4);
-    colors = _mm256_and_si256(_mm256_srlv_epi32(colors, shift),mask);
-    groups = _mm256_and_si256(_mm256_srlv_epi32(groups, shift),mask);
+    //color is lower 16 bit
+    //group is upper 16 bit
+    auto colors = _mm256_i32gather_epi32(reinterpret_cast<const int*>(grid_group), index, 4);
+    auto groups = _mm256_srli_epi32(colors,16);
+    colors = _mm256_and_si256(colors,_mm256_set1_epi32(0xffff));
 
-    auto group_upd = _mm256_sllv_epi32(_mm256_set1_epi32(group_id), shift);
+    auto group_upd = _mm256_slli_epi32(_mm256_set1_epi32(group_id), 16);
 
     valid = _mm256_and_si256(valid, _mm256_cmpeq_epi32(colors,_mm256_set1_epi32(color)));
     valid = _mm256_and_si256(valid, _mm256_cmpeq_epi32(groups,_mm256_setzero_si256()));
 
-    group_upd = _mm256_and_si256(group_upd,valid);
+    group_upd = _mm256_or_si256(_mm256_and_si256(group_upd,valid),colors);
 
     _mm256_store_si256((__m256i*)wrk.pt_valid,valid);
     _mm256_store_si256((__m256i*)wrk.pt_rc,rc);
-    _mm256_store_si256((__m256i*)wrk.pt_idx32,v32index);
-    _mm256_store_si256((__m256i*)wrk.group_upd,group_upd);
+    _mm256_store_si256((__m256i*)wrk.pt_idx,index);
+    _mm256_store_si256((__m256i*)wrk.grid_upd,group_upd);
 }
 
 //NOTE: dim = {nrow-1,ncol-1}
-inline void fillGroupFromPositionAVX(const SearchState& ss, Point & dim, Point & seed, uint8_t color,uint8_t group_id, Workspace& wrk)
+inline void fillGroupFromPositionAVX(SearchState& ss, Point & dim, Point & seed, int color,int group_id, Workspace& wrk)
 {
     auto & ring = wrk.ring;
     Point2x pts;
@@ -139,17 +136,17 @@ inline void fillGroupFromPositionAVX(const SearchState& ss, Point & dim, Point &
     scr.dirs = _mm256_setr_epi16(-1,0,0,-1,0,1,1,0,   -1,0,0,-1,0,1,1,0);
 
     ring.push_back( Point2x{{seed,dummy}} );
-    wrk.group_map[ seed.r*ss.ncol+seed.c ] = group_id;
-    uint32_t *group_map32 = reinterpret_cast<uint32_t*>(wrk.group_map);
+    ss.setGroupAt(seed.r,seed.c,group_id);
+
     while (!ring.empty())
     {
         auto pt2 = ring.popfirst();
-        process2points(pt2.arr, color, group_id, ss.grid, wrk.group_map, scr);
+        process2points(pt2.arr, color, group_id, ss.grid, scr);
         for(int i=0;i<8;++i)
             if (scr.pt_valid[i])
             {
-                pts.arr[npts++]=scr.pt_rc[i];
-                group_map32[scr.pt_idx32[i]] |= scr.group_upd[i];
+                pts.arr[npts++] = scr.pt_rc[i];
+                ss.grid[scr.pt_idx[i]] = scr.grid_upd[i];
                 if (2==npts) {
                     ring.push_back(pts);
                     npts = 0;
@@ -163,7 +160,7 @@ inline void fillGroupFromPositionAVX(const SearchState& ss, Point & dim, Point &
     }
 }
 
-inline void fillGroupFromPosition(const SearchState& ss, Point & dim, Point & seed, uint8_t color,uint8_t group, Workspace& wrk)
+inline void fillGroupFromPosition(SearchState& ss, Point & dim, Point & seed, int color,int group_id, Workspace& wrk)
 {
     static constexpr std::tuple<int8_t,int8_t> Directions[4] = {{-1,0},{0,-1},{0,1},{1,0}};
     auto & points = wrk.ring;
@@ -174,7 +171,8 @@ inline void fillGroupFromPosition(const SearchState& ss, Point & dim, Point & se
         p2x = points.popfirst();
         auto r = p2x.arr[0].r;
         auto c = p2x.arr[0].c;
-        wrk.group_map[r*ss.ncol+c] = group;
+        ss.setGroupAt(r,c,group_id);
+        
         #pragma GCC unroll 4
         for (auto [dr,dc]:Directions)
         {
@@ -182,8 +180,8 @@ inline void fillGroupFromPosition(const SearchState& ss, Point & dim, Point & se
             if (r1 < 0 || r1 > dim.r) continue;
             const int8_t c1=c+dc;
             if (c1 < 0 || c1 > dim.c) continue;
-            const auto idx = r1*ss.ncol+c1;
-            if (color == ss.grid[idx] && 0==wrk.group_map[idx])
+            const auto [c,gr] = ss.getAt(r1,c1);
+            if (color == c && 0 == gr)
             {
                 p2x.arr[0] = {r1,c1};
                 points.push_back( p2x );
@@ -191,38 +189,34 @@ inline void fillGroupFromPosition(const SearchState& ss, Point & dim, Point & se
         }
     }
 }
-int partitionGrid(const SearchState& ss,Workspace& wrk)
+int partitionGrid(SearchState& ss,Workspace& wrk)
 {
     const int nrow = ss.nrow;
     const int ncol = ss.ncol;
     uint8_t nextGroup = 1;
-    wrk.clearGroupMap(nrow*ncol);
-    auto *group_map = wrk.group_map;
-    auto *grid = ss.grid;
     Point seed, dim={ss.nrow-1,ss.ncol-1};
-    for (seed.r=0;seed.r<nrow;++seed.r)
-        for(seed.c=0;seed.c<ncol;++seed.c)
+    int idx = 0;
+    for (seed.r = 0; seed.r < nrow; ++seed.r)
+        for(seed.c = 0; seed.c < ncol; ++seed.c,++idx)
         {
-            if (0==*group_map && EmptySpace != *grid)
+            const auto [color,group] = ss.getAt(idx);
+            if (EmptySpace != color && 0 == group)
             {
-                fillGroupFromPosition(ss,dim,seed,*grid,nextGroup++,wrk);
+                fillGroupFromPositionAVX(ss,dim,seed,color,nextGroup++,wrk);
             }
-            ++group_map;
-            ++grid;
         }
     return nextGroup-1;
 }
-void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList& blocks)
+void collectGroups(SearchState& ss,int ngroups,Workspace& wrk, BlockList& blocks)
 {
     blocks.ngroups = ngroups;
     blocks.npoints = 0;
-    const int totSize = nrow*ncol;
-    const auto *group_map = wrk.group_map;
+    const int totSize = ss.nrow*ss.ncol;
     const size_t group_count_bytes = sizeof(Workspace::GroupCount_t)*(ngroups+1);
     auto* group_count = wrk.group_count;
     memset(group_count,0,group_count_bytes);
     for(int i=0;i<totSize;++i){
-        ++group_count[ group_map[i] ];
+        ++group_count[ ss.groupAt(i) ];
     }
     group_count[0] = 0; //group id 0 is invalid
     for(int i=1;i<=ngroups;++i)
@@ -233,14 +227,14 @@ void collectGroups(int nrow,int ncol,int ngroups,Workspace& wrk, BlockList& bloc
         blocks.groups[i-1] = {i,first,nelem};
     }
     memset(group_count,0,group_count_bytes);
-    group_map = wrk.group_map;
-    for (int16_t r=0;r<nrow;++r)
-        for (int16_t c=0;c<ncol;++c,++group_map)
+    int idx = 0;
+    for (int16_t r = 0; r < ss.nrow; ++r)
+        for (int16_t c = 0; c < ss.ncol; ++c,++idx)
         {
-            auto group_id = *group_map;
-            if (*group_map != 0) 
+            auto group_id = ss.groupAt(idx);
+            if (group_id != 0) 
             {
-                const auto group_idx = *group_map-1;
+                const auto group_idx = group_id - 1;
                 const int pt_idx = get<1>(blocks.groups[group_idx]) + group_count[group_idx];
                 blocks.points[pt_idx] = Point{r,c};
                 ++group_count[group_idx];
@@ -261,7 +255,7 @@ SearchState* removeGroup(SearchState& ss, int group_idx, Workspace& wrk)
     newss->nrow = ss.nrow;
     newss->ncol = ss.ncol;
     const auto totSize = ss.nrow*ss.ncol;
-    memcpy(newss->grid,ss.grid,totSize*sizeof(ss.grid[0]));
+    for (int i=0;i<totSize; ++i) newss->grid[i] = ss.gridAt(i);
     const auto [id,first,nelem] = ss.blocks.groups[group_idx];
     auto * newgrid = newss->grid;
     for (int i=0;i<nelem;++i) {
@@ -309,16 +303,17 @@ bool updateColumn(SearchState& ss,int icol)
 }
 void removeColumn(SearchState& ss, int icol)
 {
+    const int ElemSize = sizeof(ss.grid[0]);
     auto *dst = ss.grid + icol, *src = dst + 1;
     int cnt = ss.ncol - 1;
     for (int r=0;r<ss.nrow-1;++r)
     {
-        memmove(dst,src,cnt*sizeof(ss.grid[0]));
+        memmove(dst,src,cnt * ElemSize);
         dst += cnt;
         src += cnt+1;
     }
     //last row
-    memmove(dst,src,ss.ncol-1-icol);
+    memmove(dst,src,(ss.ncol-1-icol) * ElemSize);
     --ss.ncol;
 }
 void removeEmptyRows(SearchState& ss)
@@ -354,9 +349,10 @@ void printGrid(const SearchState& ss)
 //return [points, group_index]
 std::tuple<int,int> solveInternal(SearchState& ss,Workspace& wrk,int level)
 {
+    static unsigned int nLeafs = 0;
     const int ngroups = partitionGrid(ss,wrk);
     //printf("level %d grid (%d,%d) groups %d\n",level,ss.nrow,ss.ncol,ngroups);
-    collectGroups(ss.nrow,ss.ncol,ngroups,wrk,ss.blocks);
+    collectGroups(ss,ngroups,wrk,ss.blocks);
     if (stopConditionReached(ss))
     {
         printf("\rlevel %d pts %d",level,ss.blocks.ngroups);

@@ -29,12 +29,12 @@ target_compile_options(unit_tests PUBLIC
 target_link_libraries(unit_tests click-o-mania-lib gtest gtest_main pthread stdc++)
 target_link_options(unit_tests PUBLIC -fsanitize=address)
 #add_test(unit_tests)
-add_executable(avx_tests avx-experiments.cpp)
-target_compile_options(avx_tests PUBLIC 
-    -fsanitize=address
-    -gdwarf-3
-    -march=x86-64-v3
-    -Og
-)
-target_link_libraries(avx_tests click-o-mania-lib gtest gtest_main pthread stdc++)
-target_link_options(avx_tests PUBLIC -fsanitize=address)
+#add_executable(avx_tests avx-experiments.cpp)
+#target_compile_options(avx_tests PUBLIC 
+#    -fsanitize=address
+#    -gdwarf-3
+#    -march=x86-64-v3
+#    -Og
+#)
+#target_link_libraries(avx_tests click-o-mania-lib gtest gtest_main pthread stdc++)
+#target_link_options(avx_tests PUBLIC -fsanitize=address)

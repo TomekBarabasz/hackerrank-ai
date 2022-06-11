@@ -40,16 +40,13 @@ TEST(Partition,test_01)
 {
     auto * pss = makeGrid({"112","132","122"});
     auto & ss = *pss;
-    Workspace wrk(ss.nrow,ss.ncol);
-    //auto wrk = Workspace::make(ss.nrow,ss.ncol);
-    // @test partition(grid) == [1 1 2;1 3 2;1 2 2]
-    int ng = partitionGrid(ss,wrk);
-    //printIntGrid(wrk.group_map, ss.nrow,ss.ncol);
-    ASSERT_EQ(3,ng);
 
+    Workspace wrk(ss.nrow,ss.ncol);
+    int ng = partitionGrid(ss,wrk);
+    ASSERT_EQ(3,ng);
     const int8_t exp[] = {1, 1, 2, 1, 3, 2, 1, 2, 2};
     for (int idx=0;idx<ss.nrow*ss.ncol;++idx){
-        ASSERT_EQ(exp[idx], wrk.group_map[idx]);
+        ASSERT_EQ(exp[idx], ss.groupAt(idx));
     }
     delete pss;
 }
@@ -58,12 +55,11 @@ TEST(Partition,test_011)
     auto * pss = makeGrid({"112","132","122"});
     auto & ss = *pss;
     auto wrk = Workspace(ss.nrow,ss.ncol);
-    // @test partition(grid) == [1 1 2;1 3 2;1 2 2]
     int ng = partitionGrid(ss,wrk);
     ASSERT_EQ(3,ng);
     const int8_t exp[] = {1, 1, 2, 1, 3, 2, 1, 2, 2};
     for (int idx=0;idx<ss.nrow*ss.ncol;++idx){
-        ASSERT_EQ(exp[idx], wrk.group_map[idx]);
+        ASSERT_EQ(exp[idx], ss.groupAt(idx));
     }
     delete pss;
 }
@@ -76,14 +72,12 @@ TEST(Partition,test_02)
                             "68795"});
     auto & ss = *pss;
     Workspace wrk(ss.nrow,ss.ncol);
-    //@test partition(grid) == [1 1 1 2 2;3 1 3 4 4;3 3 3 5 4;6 7 8 5 5;6 9 10 11 5]
     int ng = partitionGrid(ss,wrk);
-    //printIntGrid(wrk.group_map, ss.nrow,ss.ncol);
 
     ASSERT_EQ(11,ng);
     const int8_t exp[] = {1, 1, 1, 2, 2, 3, 1, 3, 4, 4, 3, 3, 3, 5, 4, 6, 7, 8, 5, 5, 6, 9, 10, 11, 5};
     for (int idx=0;idx<ss.nrow*ss.ncol;++idx){
-        ASSERT_EQ(exp[idx], wrk.group_map[idx]);
+        ASSERT_EQ(exp[idx], ss.groupAt(idx));
     }
     delete pss;
 }
@@ -97,10 +91,15 @@ TEST(Partition,test_03)
     auto & ss = *pss;
     Workspace wrk(ss.nrow,ss.ncol);
     int ng = partitionGrid(ss,wrk);
-    printIntGrid(wrk.group_map, ss.nrow,ss.ncol);
-
+    ASSERT_EQ(9,ng);
+    
+    const int8_t exp[] = {1, 2, 3, 3, 2, 2, 4, 4, 5, 2, 6, 4, 7, 2, 2, 4, 8, 2, 2, 9};
+    for (int idx=0;idx<ss.nrow*ss.ncol;++idx){
+        ASSERT_EQ(exp[idx], ss.groupAt(idx));
+    }
     delete pss;
 }
+
 TEST(CollectGroups,test_01)
 {
     auto *pss = makeGrid({"112","132","122"});
@@ -109,7 +108,7 @@ TEST(CollectGroups,test_01)
     // @test partition(grid) == [1 1 2;1 3 2;1 2 2]
     int ng = partitionGrid(ss,wrk);
     ASSERT_EQ(3,ng);
-    collectGroups(ss.nrow,ss.ncol,ng,wrk,ss.blocks);
+    collectGroups(ss,ng,wrk,ss.blocks);
     auto & blocks = ss.blocks;
     ASSERT_EQ(3,blocks.ngroups);
     //group 1
@@ -153,7 +152,7 @@ TEST(updateColumn,test_01)
     ASSERT_FALSE(empty);
     int8_t exp[] = {'1','2','3','3','4','5','6','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(updateColumn,test_02)
@@ -165,7 +164,7 @@ TEST(updateColumn,test_02)
     ASSERT_FALSE(empty);
     int8_t exp[] = {'-','2','3','3','1','3','6','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(updateColumn,test_03)
@@ -177,7 +176,7 @@ TEST(updateColumn,test_03)
     ASSERT_FALSE(empty);
     int8_t exp[] = {'-','2','3','1','1','3','6','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(updateColumn,test_04)
@@ -190,7 +189,7 @@ TEST(updateColumn,test_04)
     //@test updateColumn(grid,1) == makeGrid([" 23","113","387"])
     int8_t exp[] = {'-','2','3','1','1','3','3','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(updateColumn,test_05)
@@ -211,7 +210,7 @@ TEST(updateColumn,test_06)
     ASSERT_FALSE(empty);
     int8_t exp[] = {'1','-','3','3','-','3','4','2','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeColumn,test_01)
@@ -223,7 +222,7 @@ TEST(removeColumn,test_01)
     ASSERT_EQ(2,pss->ncol);
     int8_t exp[] = {'2','3','1','3','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeColumn,test_02)
@@ -235,7 +234,7 @@ TEST(removeColumn,test_02)
     ASSERT_EQ(2,pss->ncol);
     int8_t exp[] = {'2','3','1','3','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeColumn,test_03)
@@ -247,7 +246,7 @@ TEST(removeColumn,test_03)
     ASSERT_EQ(2,pss->ncol);
     int8_t exp[] = {'2','3','1','3','8','7'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeEmptyRows,test_01)
@@ -259,7 +258,7 @@ TEST(removeEmptyRows,test_01)
     ASSERT_EQ(3,pss->nrow);
     int8_t exp[] = {'-','2','3','4','-','6','7','8','-'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeEmptyRows,test_02)
@@ -271,7 +270,7 @@ TEST(removeEmptyRows,test_02)
     ASSERT_EQ(2,pss->nrow);
     int8_t exp[] = {'4','-','6','7','8','-'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeEmptyRows,test_03)
@@ -283,7 +282,7 @@ TEST(removeEmptyRows,test_03)
     ASSERT_EQ(1,pss->nrow);
     int8_t exp[] = {'7','8','-'};
     for (int idx=0;idx<pss->nrow*pss->ncol;++idx)
-        ASSERT_EQ(exp[idx], pss->grid[idx]);
+        ASSERT_EQ(exp[idx], pss->gridAt(idx));
     delete pss;
 }
 TEST(removeEmptyRows,test_04)
@@ -305,7 +304,7 @@ TEST(removeGroup,test_01)
     Workspace wrk(pss->nrow,pss->ncol);
     int ng = partitionGrid(*pss,wrk);
     ASSERT_EQ(9,ng);
-    collectGroups(pss->nrow,pss->ncol,ng,wrk,pss->blocks);
+    collectGroups(*pss,ng,wrk,pss->blocks);
     auto *nss = removeGroup(*pss,0,wrk);    //groups are sorted by size!
     auto * grid = nss->grid;
     /*for(int r=0;r<nss->nrow;++r) {
@@ -316,7 +315,7 @@ TEST(removeGroup,test_01)
     ASSERT_EQ(5,nss->nrow);
     int8_t exp[] = {'-','-','b', 'b','-','y', 'y','b','y', 'b','y','y', 'y','b','b'};
     for (int idx=0;idx<nss->nrow*nss->ncol;++idx)
-        ASSERT_EQ(exp[idx], nss->grid[idx]);
+        ASSERT_EQ(exp[idx], nss->gridAt(idx));
     delete pss;
     delete nss;
 }
