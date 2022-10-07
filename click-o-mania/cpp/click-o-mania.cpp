@@ -9,7 +9,8 @@ using namespace std;
 
 namespace Click_o_mania
 {
-void initGrid(std::initializer_list<std::string> init,SearchState *pss)
+template <typename T>
+void initGrid(T init,SearchState *pss)
 {
     auto *grid = pss->grid;
     int idx=0;
@@ -19,7 +20,8 @@ void initGrid(std::initializer_list<std::string> init,SearchState *pss)
         }
     }
 }
-SearchState* makeGrid(std::initializer_list<std::string> init)
+template <typename T>
+SearchState* makeGrid_i(T init)
 {
     static_assert(std::is_same<std::string::value_type,char>::value);
     const int nrow = init.size();
@@ -202,7 +204,7 @@ int partitionGrid(SearchState& ss,Workspace& wrk)
             const auto [color,group] = ss.getAt(idx);
             if (EmptySpace != color && 0 == group)
             {
-                fillGroupFromPositionAVX(ss,dim,seed,color,nextGroup++,wrk);
+                fillGroupFromPosition(ss,dim,seed,color,nextGroup++,wrk);
             }
         }
     return nextGroup-1;
@@ -349,12 +351,13 @@ void printGrid(const SearchState& ss)
 //return [points, group_index]
 std::tuple<int,int> solveInternal(SearchState& ss,Workspace& wrk,int level)
 {
-    static unsigned int nLeafs = 0;
     const int ngroups = partitionGrid(ss,wrk);
     //printf("level %d grid (%d,%d) groups %d\n",level,ss.nrow,ss.ncol,ngroups);
     collectGroups(ss,ngroups,wrk,ss.blocks);
     if (stopConditionReached(ss))
     {
+        static unsigned int nLeafs = 0;
+        if (++nLeafs > 1000000) exit(1);
         printf("\rlevel %d pts %d",level,ss.blocks.ngroups);
         return {ss.blocks.ngroups,0};
     }
@@ -385,7 +388,8 @@ std::tuple<int,int> solveInternal(SearchState& ss,Workspace& wrk,int level)
         return {min_pts,min_gi};
     }
 }
-Point solve(std::initializer_list<std::string> init)
+template<typename T>
+Point solve_i(T init)
 {
     Workspace wrk = Workspace(init.size(),init.begin()->size());
     auto *pss = wrk.allocSearchState();
@@ -395,4 +399,13 @@ Point solve(std::initializer_list<std::string> init)
     wrk.releaseSearchState(pss);
     return res;
 }
+
+//template decltype(solve<std::initializer_list<std::string>>) solve<std::initializer_list<std::string>>;
+//template decltype(solve<const std::vector<std::string>&>) solve<const std::vector<std::string>&>;
+//template Point solve(const std::vector<string>&);
+Point solve(const std::vector<std::string> & init) { return solve_i(init); }
+Point solve(std::initializer_list<std::string> init) { return solve_i(init); }
+
+SearchState* makeGrid(const std::vector<string>& init) { return makeGrid_i(init);}
+SearchState* makeGrid(std::initializer_list<string> init) { return makeGrid_i(init);}
 }

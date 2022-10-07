@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_COMPILER /usr/lib/llvm-14/bin/clang)
 find_package(PkgConfig REQUIRED)
-project(c++20)
 set(CMAKE_CXX_STANDARD 20)
 project(click-o-mania)
 include_directories(${GTEST_INCLUDE_DIRS} src)

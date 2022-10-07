@@ -264,6 +264,7 @@ struct Workspace
 
 constexpr uint8_t EmptySpace = '-';
 SearchState* makeGrid(std::initializer_list<std::string> init);
+SearchState* makeGrid(const std::vector<std::string> & init);
 void printGrid(const SearchState& ss);
 int partitionGrid(SearchState& ss,Workspace& wrk);
 void collectGroups(SearchState& ss,int groups,Workspace& wrk, BlockList& blocks);
@@ -273,5 +274,6 @@ bool updateColumn(SearchState& ss,int icol);
 void removeColumn(SearchState& ss, int icol);
 void removeEmptyRows(SearchState& ss);
 Point solve(std::initializer_list<std::string> init);
+Point solve(const std::vector<std::string> & init);
 }
 
